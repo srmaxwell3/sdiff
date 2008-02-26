@@ -22,10 +22,11 @@ enum DiffFormat {
   Unified
 };
 
-DiffFormat diffFormat = Context;
-unsigned optCopyContext = 3;
+DiffFormat diffFormat = SideBySide;
 
-int optVerbose = 1;
+unsigned optCopyContext = 3;
+unsigned optPageWidth = 130;
+unsigned optVerbose = 2;
 
 struct Line : public string {
   Line (string _text) :
@@ -45,7 +46,7 @@ struct Line : public string {
     for (list<unsigned>::iterator i = copies[1].begin (); i != copies[1].end (); i++) {
       fprintf (out, "%u ", *i);
     }
-    fprintf (out, "}}\t%s", c_str ());
+    fprintf (out, "}}\t%s\n", c_str ());
   }
   list<unsigned> copies[2];
 };
@@ -107,6 +108,7 @@ int main (int argc, char *argv[])
     if (FILE *f = fopen (files[n], "r")) {
       if (0 < optVerbose) {
         fprintf (stderr, "# Reading %s...", files[n]);
+        fflush (stderr);
       }
 
       char buffer[1024];
@@ -114,6 +116,8 @@ int main (int argc, char *argv[])
 
       while (fgets (buffer, sizeof (buffer), f)) {
         string text (buffer);
+
+        text.erase (text.end () - 1);
 
         Line *line = table[text];
 
@@ -127,9 +131,11 @@ int main (int argc, char *argv[])
 
       if (0 < optVerbose) {
         fprintf (stderr, " %u lines, %u unique.\n", lines[n].size (), nUniq);
+        fflush (stderr);
       }
     } else {
       fprintf (stderr, "%s: Unable to open %s!  Exiting....\n", ARGV0, files[n]);
+      fflush (stderr);
       perror (ARGV0);
       exit (1);
     }
@@ -137,6 +143,7 @@ int main (int argc, char *argv[])
 
   if (0 < optVerbose) {
     fprintf (stderr, "# Total unique lines = %d\n", table.size ());
+    fflush (stderr);
   }
 
   // map<int, int> counts;
@@ -166,6 +173,7 @@ void pass1 ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass 1 (finding matches amongst unique lines)...");
+    fflush (stderr);
   }
 
   nMatchedLines = 0;
@@ -208,12 +216,15 @@ void pass1 ()
 
   if (0 < optVerbose) {
     fprintf (stderr, " found %u matched lines (%u total).\n", nMatchedLines, nTotalMatchedLines);
+    fflush (stderr);
 
-    if (1 < optVerbose) {
+    if (2 < optVerbose) {
       for (int f = 0; f < 2; f += 1) {
         fprintf (stderr, "# file #%d\n", f + 1);
+        fflush (stderr);
         for (int l = 0; l < lines[f].size (); l += 1) {
           fprintf (stderr, "#   [%d] ", l);
+          fflush (stderr);
           lines[f][l].Dump (stderr);
         }
       }
@@ -228,6 +239,7 @@ void pass2 ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass #2 (spreading matches down)...");
+    fflush (stderr);
   }
 
   nMatchedBlocks = 0;
@@ -304,11 +316,14 @@ void pass2 ()
              nTotalMatchedLines,
              nTotalMatchedBlocks
             );
-    if (1 < optVerbose) {
+    fflush (stderr);
+    if (2 < optVerbose) {
       for (int f = 0; f < 2; f += 1) {
         fprintf (stderr, "# file #%d\n", f + 1);
+        fflush (stderr);
         for (int l = 0; l < lines[f].size (); l += 1) {
           fprintf (stderr, "#   [%d] ", l);
+          fflush (stderr);
           lines[f][l].Dump (stderr);
         }
       }
@@ -323,6 +338,7 @@ void pass3 ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass #3 (spreading matches up)...");
+    fflush (stderr);
   }
 
   nMatchedBlocks = 0;
@@ -398,12 +414,15 @@ void pass3 ()
              nTotalMatchedLines,
              nTotalMatchedBlocks
             );
+    fflush (stderr);
 
-    if (1 < optVerbose) {
+    if (2 < optVerbose) {
       for (int f = 0; f < 2; f += 1) {
         fprintf (stderr, "# file #%d\n", f + 1);
+        fflush (stderr);
         for (int l = 0; l < lines[f].size (); l += 1) {
           fprintf (stderr, "#   [%d] ", l);
+          fflush (stderr);
           lines[f][l].Dump (stderr);
         }
       }
@@ -419,6 +438,7 @@ void pass4 ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass 4 (finding remaining matches amongst unique lines)...");
+    fflush (stderr);
   }
 
   nMatchedLines = 0;
@@ -458,12 +478,15 @@ void pass4 ()
 
   if (0 < optVerbose) {
     fprintf (stderr, " found %u matched lines (%u total).\n", nMatchedLines, nTotalMatchedLines);
+    fflush (stderr);
 
-    if (1 < optVerbose) {
+    if (2 < optVerbose) {
       for (int f = 0; f < 2; f += 1) {
         fprintf (stderr, "# file #%d\n", f + 1);
+        fflush (stderr);
         for (int l = 0; l < lines[f].size (); l += 1) {
           fprintf (stderr, "#   [%d] ", l);
+          fflush (stderr);
           lines[f][l].Dump (stderr);
         }
       }
@@ -480,6 +503,7 @@ void pass5 ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass #5 (unmatching block moves)...\n");
+    fflush (stderr);
   }
 
   nMatchedBlocks = 0;
@@ -628,12 +652,15 @@ void pass5 ()
              nTotalMatchedLines,
              nTotalMatchedBlocks
             );
+    fflush (stderr);
 
-    if (1 < optVerbose) {
+    if (2 < optVerbose) {
       for (int f = 0; f < 2; f += 1) {
         fprintf (stderr, "# file #%d\n", f + 1);
+        fflush (stderr);
         for (int l = 0; l < lines[f].size (); l += 1) {
           fprintf (stderr, "#   [%d] ", l);
+          fflush (stderr);
           lines[f][l].Dump (stderr);
         }
       }
@@ -650,6 +677,7 @@ void pass6n ();
 void pass6r ();
 void pass6s ();
 void pass6u ();
+void pass6y ();
 
 void pass6 ()
 {
@@ -676,7 +704,7 @@ void pass6 ()
     break;
 
   case SideBySide:
-    pass6s ();
+    pass6y ();
     break;
 
   case Unified:
@@ -706,7 +734,8 @@ template<typename T> T max (T l, T r) {
 
 void pass6c () {
   if (0 < optVerbose) {
-    fprintf (stderr, "# Pass #6u (walking the differences)...\n");
+    fprintf (stderr, "# Pass #6c (walking the differences)...\n");
+    fflush (stderr);
   }
 
   nMatchedLines = 0;
@@ -734,16 +763,24 @@ void pass6c () {
       continue;
     }
 
-    // We're looking at at least 1 delete or insert, so a window
+    // We're now looking at at least 1 delete or insert, so a window
     // begins here (or, rather, optCopyContext lines earlier).
     
-    int boOldWindow = max (0, int (boDeletes) - int(optCopyContext));
-    int eoOldWindow = min (int (lines[0].size ()), int(o) + int(optCopyContext));
+    int boOldWindow = max (0, int (o) - int (optCopyContext));
+    int boNewWindow = max (0, int (n) - int (optCopyContext));
 
-    // Look for the end of the window.
+    if (1 < optVerbose) {
+      fprintf (stderr, "boOldWindow = %d, boNewWindow = %d\n", boOldWindow, boNewWindow);
+      fflush (stderr);
+    }
 
-    bool widenWindow = false;
-    do {
+    // Look for the end of the current window.
+
+    int eoOldWindow;
+    int eoNewWindow;
+
+    bool widenWindow = true;
+    while (widenWindow && o < lines[0].size () || n < lines[1].size ()) {
 
       // Skip over the delete(s) and/or insert(s) defining the current
       // context.
@@ -755,43 +792,59 @@ void pass6c () {
         n += 1;
       }
 
-      // ...  This context will end optCopyContext lines past the last
-      // set of deletes or inserts we find.  However, since another
-      // window could follow, we look 2 * optCopyContext ahead for
-      // another delete or insert.
+      // This context will end optCopyContext matched lines past the
+      // last set of deletes or inserts we find.
 
-      for (unsigned l = 0; l < (2 * optCopyContext); i += 1) {
+      widenWindow = false;
+      for (unsigned l = 0; !widenWindow && l < optCopyContext; l += 1) {
         if (o < lines[0].size ()) {
-          if (widenWindow |= lines[0][o].l == ~0) {
-            break;
-          }
+          widenWindow |= lines[0][o].l == ~0;
           o += 1;
         }
         if (n < lines[1].size ()) {
-          if (widenWindow |= lines[1][o].l == ~0) {
-            break;
-          }
+          widenWindow |= lines[1][n].l == ~0;
           n += 1;
         }
       }
-    } while (widenWindow);
+
+      eoOldWindow = o;
+      eoNewWindow = n;
+
+      // However, since another window could follow, we look
+      // optCopyContext ahead for another delete or insert.
+
+      if (!widenWindow) {
+        for (unsigned l = 0; l < (2 * optCopyContext + 1); l += 1) {
+          if (o < lines[0].size ()) {
+            widenWindow |= lines[0][o].l == ~0;
+            o += 1;
+          }
+          if (n < lines[1].size ()) {
+            widenWindow |= lines[1][n].l == ~0;
+            n += 1;
+          }
+        }
+      }
+    }
 
     // We've found the end of the window.
 
-    int boNewWindow = max (0, int (boInserts) - int (optCopyContext));
-    int eoNewWindow = min (int (lines[1].size ()), int(n) + int (optCopyContext));
+    if (1 < optVerbose) {
+      fprintf (stderr, "eoOldWindow = %d, eoNewWindow = %d\n", eoOldWindow, eoNewWindow);
+      fflush (stderr);
+    }
 
     // Now, reset ourselves to the start of the window, and walk it to
     // produce the output.  We'll walk it twice, first for the old
     // file part, then for the new file part.
 
     fprintf (stdout, "***************\n");
-    fprintf (stdout, "*** %d,%d ****\n", boOldWindow + 1, eoOldWindow + 1);
+    fprintf (stdout, "*** %d,%d ****\n", boOldWindow + 1, eoOldWindow);
 
     o = boOldWindow;
     n = boNewWindow;
 
-    while (o < eoOldWindow && n < eoNewWindow) {
+    while (o < eoOldWindow || n < eoNewWindow) {
 
       // Find any unmatched lines at this point in the old file.  These
       // are deletes.
@@ -822,25 +875,25 @@ void pass6c () {
         // ... deletes and inserts.
 
         for (unsigned l = boDeletes; l < o; l += 1) {
-          fprintf (stdout, "! %s", lines[0][l].line->c_str ());
+          fprintf (stdout, "! %s\n", lines[0][l].line->c_str ());
         }
       } else if (nDeletes) {
 
         //  ... just deletes.
 
         for (unsigned l = boDeletes; l < o; l += 1) {
-          fprintf (stdout, "- %s", lines[0][l].line->c_str ());
+          fprintf (stdout, "- %s\n", lines[0][l].line->c_str ());
         }
       }
 
       // When we get here, we're dealing with matching lines.
 
-      fprintf (stdout, "  %s", lines[0][l].line->c_str ());
+      fprintf (stdout, "  %s\n", lines[0][o].line->c_str ());
       o += 1;
       n += 1;
     }
 
-    fprintf (stdout, "--- %d,%d ----\n", boNewWindow + 1, eoNewWindow + 1);
+    fprintf (stdout, "--- %d,%d ----\n", boNewWindow + 1, eoNewWindow);
 
     o = boOldWindow;
     n = boNewWindow;
@@ -876,36 +929,46 @@ void pass6c () {
         // ... deletes and inserts.
 
         for (unsigned l = boInserts; l < n; l += 1) {
-          fprintf (stdout, "! %s", lines[1][l].line->c_str ());
+          fprintf (stdout, "! %s\n", lines[1][l].line->c_str ());
         }
       } else if (nInserts) {
 
         //  ... just inserts.
 
         for (unsigned l = boInserts; l < n; l += 1) {
-          fprintf (stdout, "+ %s", lines[1][l].line->c_str ());
+          fprintf (stdout, "+ %s\n", lines[1][l].line->c_str ());
         }
       }
 
       // When we get here, we're dealing with matching lines.
 
-      fprintf (stdout, "  %s", lines[1][l].line->c_str ());
+      fprintf (stdout, "  %s\n", lines[1][n].line->c_str ());
       o += 1;
       n += 1;
     }
+
+    // Reset to the end of the current window.
+
+    o = eoOldWindow;
+    n = eoNewWindow;
   }
 }
 
 void pass6e () {
+  fprintf (stderr, "pass6e() is unimplemented!\n");
+  fflush (stderr);
 }
 
 void pass6i () {
+  fprintf (stderr, "pass6i() is unimplemented!\n");
+  fflush (stderr);
 }
 
 void pass6n ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass #6n (walking the differences)...\n");
+    fflush (stderr);
   }
 
   nMatchedLines = 0;
@@ -959,11 +1022,11 @@ void pass6n ()
         fprintf (stdout, "%dc%d,%d\n", boDeletes + 1, boInserts + 1, n);
       } 
       for (unsigned l = boDeletes; l < o; l += 1) {
-        fprintf (stdout, "< %s", lines[0][l].line->c_str ());
+        fprintf (stdout, "< %s\n", lines[0][l].line->c_str ());
       }
-      fprintf (stderr, "---\n");
+      fprintf (stdout, "---\n");
       for (unsigned l = boInserts; l < n; l += 1) {
-        fprintf (stdout, "> %s", lines[1][l].line->c_str ());
+        fprintf (stdout, "> %s\n", lines[1][l].line->c_str ());
       }
     } else if (nDeletes) {
 
@@ -975,7 +1038,7 @@ void pass6n ()
         fprintf (stdout, "%dd%d\n", boDeletes + 1, n);
       }
       for (unsigned l = boDeletes; l < o; l += 1) {
-        fprintf (stdout, "< %s", lines[0][l].line->c_str ());
+        fprintf (stdout, "< %s\n", lines[0][l].line->c_str ());
       }
     } else if (nInserts) {
 
@@ -987,7 +1050,7 @@ void pass6n ()
         fprintf (stdout, "%da%d\n", o, boInserts + 1);
       }
       for (unsigned l = boInserts; l < n; l += 1) {
-        fprintf (stdout, "> %s", lines[1][l].line->c_str ());
+        fprintf (stdout, "> %s\n", lines[1][l].line->c_str ());
       }
     }
 
@@ -999,15 +1062,20 @@ void pass6n ()
 }
 
 void pass6r () {
+  fprintf (stderr, "pass6r() is unimplemented!\n");
+  fflush (stderr);
 }
 
 void pass6s () {
+  fprintf (stderr, "pass6s() is unimplemented!\n");
+  fflush (stderr);
 }
 
 void pass6u ()
 {
   if (0 < optVerbose) {
     fprintf (stderr, "# Pass #6u (walking the differences)...\n");
+    fflush (stderr);
   }
 
   nMatchedLines = 0;
@@ -1058,30 +1126,126 @@ void pass6u ()
       // ... deletes and inserts.
 
       for (unsigned l = boDeletes; l < o; l += 1) {
-        fprintf (stdout, "-%s", lines[0][l].line->c_str ());
+        fprintf (stdout, "-%s\n", lines[0][l].line->c_str ());
       }
       for (unsigned l = boInserts; l < n; l += 1) {
-        fprintf (stdout, "+%s", lines[1][l].line->c_str ());
+        fprintf (stdout, "+%s\n", lines[1][l].line->c_str ());
       }
     } else if (nDeletes) {
 
       //  ... just deletes.
 
       for (unsigned l = boDeletes; l < o; l += 1) {
-        fprintf (stdout, "-%s", lines[0][l].line->c_str ());
+        fprintf (stdout, "-%s\n", lines[0][l].line->c_str ());
       }
     } else if (nInserts) {
 
       //  ... just inserts.
 
       for (unsigned l = boInserts; l < n; l += 1) {
-        fprintf (stdout, "+%s", lines[1][l].line->c_str ());
+        fprintf (stdout, "+%s\n", lines[1][l].line->c_str ());
       }
     }
 
     // When we get here, we're dealing with matching lines.
 
-    fprintf (stdout, " %s", lines[0][o].line->c_str ());
+    fprintf (stdout, " %s\n", lines[0][o].line->c_str ());
+    o += 1;
+    n += 1;
+  }
+}
+
+void pass6y ()
+{
+  if (0 < optVerbose) {
+    fprintf (stderr, "# Pass #6y (walking the differences)...\n");
+    fflush (stderr);
+  }
+
+  // Write the header.
+
+  // None for side-by-side.
+
+  // Starting at the top of both files,...
+
+  int columnWidth = (optPageWidth - 7) / 2;
+
+  unsigned o = 0;
+  unsigned n = 0;
+
+  while (o < lines[0].size () || n < lines[1].size ()) {
+
+    // Find any unmatched lines at this point in the old file.  These
+    // are deletes.
+
+    unsigned boDeletes = o;
+    while (o < lines[0].size () && lines[0][o].l == ~0) {
+      o += 1;
+    }
+
+    // Find any unmatched lines at this point in the new file.  These
+    // are inserts.
+
+    unsigned boInserts = n;
+    while (n < lines[1].size () && lines[1][n].l == ~0) {
+      n += 1;
+    }
+
+    // We've got deleted line(s) from boDeletes .. o.
+    // We've got deleted line(s) from boInserts .. n.
+
+    unsigned nDeletes = o - boDeletes;
+    unsigned nInserts = n - boInserts;
+
+    // We've got...
+
+    while (boDeletes < o && boInserts < n) {
+
+      // ... deletes and inserts.
+
+      fprintf (stdout,
+               "%-*s | %s\n",
+               columnWidth,
+               lines[0][boDeletes].line->substr (0, columnWidth).c_str (),
+               lines[1][boInserts].line->substr (0, columnWidth).c_str ()
+              );
+      boDeletes += 1;
+      boInserts += 1;
+    }
+
+    while (boDeletes < o) {
+
+      //  ... just deletes.
+
+      fprintf (stdout,
+               "%-*s <\n",
+               columnWidth,
+               lines[0][boDeletes].line->substr (0, columnWidth).c_str ()
+              );
+      boDeletes += 1;
+    }
+
+    while (boInserts < n) {
+
+      //  ... just inserts.
+
+      fprintf (stdout,
+               "%-*s > %s\n",
+               columnWidth,
+               "",
+               lines[1][boInserts].line->substr (0, columnWidth).c_str ()
+              );
+      boInserts += 1;
+    }
+
+    // When we get here, we're dealing with matching lines.
+
+    fprintf (stdout,
+             "%-*s   %s\n",
+             columnWidth,
+             lines[0][o].line->substr (0, columnWidth).c_str (),
+             lines[1][n].line->substr (0, columnWidth).c_str ()
+            );
     o += 1;
     n += 1;
   }
