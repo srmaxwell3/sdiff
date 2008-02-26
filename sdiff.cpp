@@ -49,7 +49,7 @@ bool       opt_v_ShowVersionInfo = false;
 bool       opt_w_IgnoreAllWhitespace = false;
 string     opt_x_IgnoreFilesMatching;
 
-unsigned optVerbose = 2;
+unsigned optVerbose = 0;
 
 struct Line : public string {
   Line (string _text) :
@@ -130,15 +130,15 @@ int main (int argc, char const *const argv[])
   if (opt_v_ShowVersionInfo) {
     fprintf
       (stderr,
-       "diff () 0.0.1"
-       "Copyright (C) 2008 Sidney R Maxwell III"
-       ""
-       "This program comes with NO WARRANTY, to the extent permitted by law."
-       "You may redistribute copies of this program"
-       "under the terms of the GNU General Public License."
-       "For more information about these matters, see the file named COPYING."
-       ""
-       "Written by Sid Maxwell."
+       "diff () 0.0.1\n"
+       "Copyright (C) 2008 Sidney R Maxwell III\n"
+       "\n"
+       "This program comes with NO WARRANTY, to the extent permitted by law.\n"
+       "You may redistribute copies of this program\n"
+       "under the terms of the GNU General Public License.\n"
+       "For more information about these matters, see the file named COPYING.\n"
+       "\n"
+       "Written by Sid Maxwell.\n"
       );
     exit (0);
   }
