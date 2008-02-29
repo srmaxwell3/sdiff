@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <algorithm>
 using std::find;
 #include <string>
@@ -49,7 +50,7 @@ bool       opt_v_ShowVersionInfo = false;
 bool       opt_w_IgnoreAllWhitespace = false;
 string     opt_x_IgnoreFilesMatching;
 
-unsigned optVerbose = 0;
+unsigned opt_d_Debug = 0;
 
 struct Line : public string {
   Line (string _text) :
@@ -63,11 +64,11 @@ struct Line : public string {
   void Dump (FILE *out) {
     fprintf (out, "{{ ");
     for (list<unsigned>::iterator i = copies[0].begin (); i != copies[0].end (); i++) {
-      fprintf (out, "%u ", *i);
+      fprintf (out, "%3u ", *i);
     }
     fprintf (out, "},{ ");
     for (list<unsigned>::iterator i = copies[1].begin (); i != copies[1].end (); i++) {
-      fprintf (out, "%u ", *i);
+      fprintf (out, "%3u ", *i);
     }
     fprintf (out, "}}\t%s\n", c_str ());
   }
@@ -81,7 +82,7 @@ struct LinePtr {
   {
   }
   void Dump (FILE *out) {
-    fprintf (out, "[%d] ", l);
+    fprintf (out, "[%3d] ", l);
     line->Dump (out);
   }
   Line *line;
@@ -93,7 +94,7 @@ typedef vector<LinePtr> VectorLinePtr;
 
 // Our name.
 
-char *ARGV0 = "dif3";
+char const *ARGV0 = "sdiff";
 
 // The 'symbol' (line) table.
 
@@ -123,14 +124,46 @@ void pass4 ();
 void pass5 ();
 void pass6 ();
 
+void DumpFileLine (unsigned f, unsigned l) {
+  bool badMatch = lines[f][l].l != ~0u && lines[!f][lines[f][l].l].l != l;
+  fprintf (stderr, "#   %s[%3d]%s", f == 0 ? "" : "    ", l, badMatch ? "?" : " ");
+  fflush (stderr);
+  lines[f][l].Dump (stderr);
+}
+
+void DumpFileLines (unsigned f) {
+  for (int l = 0; l < lines[f].size (); l += 1) {
+    DumpFileLine (f, l);
+  }
+}
+
+void DumpFilesLines () {
+  for (int f = 0; f < 2; f += 1) {
+    fprintf (stderr, "# file #%d\n", f + 1);
+    fflush (stderr);
+    DumpFileLines (f);
+  }
+}
+
 int main (int argc, char const *const argv[])
 {
+  ARGV0 = const_cast<char const *> (argv[0]);
+
+  if (0 < opt_d_Debug) {
+    fprintf (stderr, "#");
+    for (int a = 0; a < argc; a += 1) {
+      fprintf (stderr, " %s", argv[a]);
+    }
+    fprintf (stderr, "\n");
+    fflush (stderr);
+  }
+
   getopts (argc, argv);
 
   if (opt_v_ShowVersionInfo) {
     fprintf
       (stderr,
-       "diff () 0.0.1\n"
+       "%s () 0.0.1\n"
        "Copyright (C) 2008 Sidney R Maxwell III\n"
        "\n"
        "This program comes with NO WARRANTY, to the extent permitted by law.\n"
@@ -138,10 +171,21 @@ int main (int argc, char const *const argv[])
        "under the terms of the GNU General Public License.\n"
        "For more information about these matters, see the file named COPYING.\n"
        "\n"
-       "Written by Sid Maxwell.\n"
+       "Written by Sid Maxwell.\n",
+       ARGV0
       );
     exit (0);
   }
+
+  // Setup a matched, beginning-of-file sentinel 'line'.
+
+  Line *BoFSentinel = new Line ("<bof>");
+  unsigned o = 0;
+  unsigned n = 0;
+  lines[0].push_back (BoFSentinel);
+  lines[1].push_back (BoFSentinel);
+  lines[0][o].l = n;
+  lines[1][n].l = o;
 
   // Read the old [0] file, and the new [1] file.
 
@@ -149,7 +193,7 @@ int main (int argc, char const *const argv[])
     files[n] = argv[a];
 
     if (FILE *f = fopen (files[n], "r")) {
-      if (0 < optVerbose) {
+      if (0 < opt_d_Debug) {
         fprintf (stderr, "# Reading %s...", files[n]);
         fflush (stderr);
       }
@@ -160,7 +204,16 @@ int main (int argc, char const *const argv[])
       while (fgets (buffer, sizeof (buffer), f)) {
         string text (buffer);
 
-        text.erase (text.end () - 1);
+        if (0 < text.size ()) {
+          if (text[text.size () - 1] == '\n') {
+            text.erase (text.end () - 1);
+            if (0 < text.size ()) {
+              if (text[text.size () - 1] == '\r') {
+                text.erase (text.end () - 1);
+              }
+            }
+          }
+        }
 
         Line *line = table[text];
 
@@ -172,7 +225,7 @@ int main (int argc, char const *const argv[])
         lines[n].push_back (line);
       }
 
-      if (0 < optVerbose) {
+      if (0 < opt_d_Debug) {
         fprintf (stderr, " %u lines, %u unique.\n", lines[n].size (), nUniq);
         fflush (stderr);
       }
@@ -184,7 +237,17 @@ int main (int argc, char const *const argv[])
     }
   }
 
-  if (0 < optVerbose) {
+  // Setup a matched, end-of-file sentinel 'line'.
+
+  Line *EoFSentinel = new Line ("<eof>");
+  o = lines[0].size ();
+  n = lines[1].size ();
+  lines[0].push_back (EoFSentinel);
+  lines[1].push_back (EoFSentinel);
+  lines[0][o].l = n;
+  lines[1][n].l = o;
+
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Total unique lines = %d\n", table.size ());
     fflush (stderr);
   }
@@ -236,6 +299,7 @@ int main (int argc, char const *const argv[])
 //
 //   --brief  -q  Output only whether files differ.
 //   --context[=NUM]  -c  -C NUM  Output NUM (default 3) lines of copied context.
+//   --debug[=NUM]  -d NUM  Set dubugging output level to NUM (default 1).
 //   --ed  -e  Output an ed script.
 //   --exclude-from=FILE  -X FILE  Exclude files that match any pattern in FILE.
 //   --exclude=PAT  -x PAT  Exclude files that match PAT.
@@ -290,29 +354,30 @@ void getopts (int argc, char const *const argv[])
     static option long_options[] = {
       { "brief",                        0, 0, 'q' }, // Output only whether files differ.
       { "context",                      2, 0, 'c' }, // Output NUM (default 3) lines of copied context.
+      { "debug",                        2, 0, 'd' }, // Debug level NUM (default 1).
       { "ed",                           0, 0, 'e' }, // Output an ed script.
-      { "exclude-from",                 1, 0, ' ' }, // Exclude files that match any pattern in FILE.
+      { "exclude-from",                 1, 0,  0  }, // Exclude files that match any pattern in FILE.
       { "exclude",                      1, 0, 'x' }, // Exclude files that match PAT.
       { "expand-tabs",                  0, 0, 't' }, // Expand tabs to spaces in output.
-      { "from-file",                    1, 0, ' ' }, // Compare FILE1 to all operands. FILE1 can be a directory.
+      { "from-file",                    1, 0,  0  }, // Compare FILE1 to all operands. FILE1 can be a directory.
       { "help",                         0, 0, 'h' }, // Output this help.
-      { "horizon-lines",                1, 0, ' ' }, // Keep NUM lines of the common prefix and suffix.
+      { "horizon-lines",                1, 0,  0  }, // Keep NUM lines of the common prefix and suffix.
       { "ifdef",                        1, 0, 'D' }, // Output merged file to show `#ifdef NAME' diffs.
       { "ignore-all-space",             0, 0, 'w' }, // Ignore all white space.
       { "ignore-blank-lines",           0, 0, 'B' }, // Ignore changes whose lines are all blank.
       { "ignore-case",                  0, 0, 'i' }, // Ignore case differences in file contents.
-      { "ignore-file-name-case",        0, 0, ' ' }, // Ignore case when comparing file names.
+      { "ignore-file-name-case",        0, 0,  0  }, // Ignore case when comparing file names.
       { "ignore-matching-lines",        1, 0, 'I' }, // Ignore changes whose lines all match RE.
       { "ignore-space-change",          0, 0, 'b' }, // Ignore changes in the amount of white space.
       { "ignore-tab-expansion",         0, 0, 'E' }, // Ignore changes due to tab expansion.
       { "initial-tab",                  0, 0, 'T' }, // Make tabs line up by prepending a tab.
-      { "label",                        1, 0, ' ' }, // Use LABEL instead of file name.
-      { "left-column",                  0, 0, ' ' }, // Output only the left column of common lines.
-      { "line-format",                  1, 0, ' ' }, // Similar, but format all input lines with LFMT.
-      { "minimal",                      0, 0, 'd' }, // Try hard to find a smaller set of changes.
+      { "label",                        1, 0,  0  }, // Use LABEL instead of file name.
+      { "left-column",                  0, 0,  0  }, // Output only the left column of common lines.
+      { "line-format",                  1, 0,  0  }, // Similar, but format all input lines with LFMT.
+      { "minimal",                      0, 0,  0  }, // Try hard to find a smaller set of changes.
       { "new-file",                     0, 0, 'N' }, // Treat absent files as empty.
-      { "no-ignore-file-name-case",     0, 0, ' ' }, // Consider case when comparing file names.
-      { "normal",                       0, 0, ' ' }, // Output a normal diff.
+      { "no-ignore-file-name-case",     0, 0,  0  }, // Consider case when comparing file names.
+      { "normal",                       0, 0,  0  }, // Output a normal diff.
       { "paginate",                     0, 0, 'l' }, // Pass the output through `pr' to paginate it.
       { "rcs",                          0, 0, 'n' }, // Output an RCS format diff.
       { "recursive",                    0, 0, 'r' }, // Recursively compare any subdirectories found.
@@ -320,13 +385,13 @@ void getopts (int argc, char const *const argv[])
       { "show-c-function",              0, 0, 'p' }, // Show which C function each change is in.
       { "show-function-line",           1, 0, 'F' }, // Show the most recent line matching RE.
       { "side-by-side",                 0, 0, 'y' }, // Output in two columns.
-      { "speed-large-files",            0, 0, ' ' }, // Assume large files and many scattered small changes.
+      { "speed-large-files",            0, 0,  0  }, // Assume large files and many scattered small changes.
       { "starting-file",                1, 0, 'S' }, // Start with FILE when comparing directories.
-      { "strip-trailing-cr",            0, 0, ' ' }, // Strip trailing carriage return on input.
-      { "suppress-common-lines",        0, 0, ' ' }, // Do not output common lines.
+      { "strip-trailing-cr",            0, 0,  0  }, // Strip trailing carriage return on input.
+      { "suppress-common-lines",        0, 0,  0  }, // Do not output common lines.
       { "text",                         0, 0, 'a' }, // Treat all files as text.
-      { "to-file",                      0, 0, ' ' }, // Compare all operands to FILE2.  FILE2 can be a directory.
-      { "unidirectional-new-file",      0, 0, ' ' }, // Treat absent first files as empty.
+      { "to-file",                      0, 0,  0  }, // Compare all operands to FILE2.  FILE2 can be a directory.
+      { "unidirectional-new-file",      0, 0,  0  }, // Treat absent first files as empty.
       { "unified",                      2, 0, 'u' }, // Output NUM (default 3) lines of unified context.
       { "version",                      0, 0, 'v' }, // Output version info.
       { "width",                        1, 0, 'W' }, // Output at most NUM (default 130) print columns.
@@ -349,7 +414,7 @@ void getopts (int argc, char const *const argv[])
       "a"                       // Treat all files as text.
       "b"                       // Ignore changes in the amount of white space.
       "c"                       // Output NUM (default 3) lines of copied context.
-      "d"                       // Try hard to find a smaller set of changes.
+      "d:"                      // Set dubugging output level to NUM (default 1).
       "e"                       // Output an ed script.
       "i"                       // Ignore case differences in file contents.
       "l"                       // Pass the output through `pr' to paginate it.
@@ -380,10 +445,25 @@ void getopts (int argc, char const *const argv[])
       return;
 
     case 0:
-      printf ("option %s", long_options[option_index].name);
-      if (optarg)
-        printf (" with arg %s", optarg);
-      printf ("\n");
+      if (strcmp (long_options[option_index].name, "normal") == 0) {
+        opt___OutputFormat = opt___Normal;
+        break;
+      }
+
+      if (optarg) {
+        fprintf (stderr,
+                 "%s: option --%s[=%s] is unsupported!  Ignoring...\n",
+                 ARGV0,
+                 long_options[option_index].name,
+                 optarg
+                );
+      } else {
+        fprintf (stderr,
+                 "%s: option --%s is unsupported!  Ignoring...\n",
+                 ARGV0,
+                 long_options[option_index].name
+                );
+      }
       break;
     case 'B':
       opt_B_IgnoreBlankLines = true;
@@ -458,7 +538,16 @@ void getopts (int argc, char const *const argv[])
       opt___OutputFormat = opt_c_Context;
       break;
     case 'd':
-      opt_d_TryToFindMinimalChanges = true;
+      {
+        unsigned debugLevel = 1;
+        if (optarg) {
+          if (sscanf (optarg, "%u", &debugLevel) != 1) {
+            fprintf (stderr, "-d <NUM> or --debug[=<NUM>] (%d)\n", opt_d_Debug);
+            exit (1);
+          }
+        }
+        opt_d_Debug = debugLevel;
+      }
       break;
     case 'e':
       opt___OutputFormat = opt_e_EdScript;
@@ -595,7 +684,7 @@ void getopts (int argc, char const *const argv[])
 
 void pass1 ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass 1 (finding matches amongst unique lines)...");
     fflush (stderr);
   }
@@ -638,20 +727,12 @@ void pass1 ()
 
   // Let's see the intermediate results.
 
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, " found %u matched lines (%u total).\n", nMatchedLines, nTotalMatchedLines);
     fflush (stderr);
 
-    if (2 < optVerbose) {
-      for (int f = 0; f < 2; f += 1) {
-        fprintf (stderr, "# file #%d\n", f + 1);
-        fflush (stderr);
-        for (int l = 0; l < lines[f].size (); l += 1) {
-          fprintf (stderr, "#   [%d] ", l);
-          fflush (stderr);
-          lines[f][l].Dump (stderr);
-        }
-      }
+    if (2 < opt_d_Debug) {
+      DumpFilesLines ();
     }
   }
 }
@@ -661,7 +742,7 @@ void pass1 ()
 
 void pass2 ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #2 (spreading matches down)...");
     fflush (stderr);
   }
@@ -675,7 +756,7 @@ void pass2 ()
 
     // ... skip any currently unmatched lines...
 
-    if (lines[0][o].l == ~0) {
+    if (lines[0][o].l == ~0u) {
       continue;
     }
 
@@ -687,7 +768,7 @@ void pass2 ()
     do {
       n = lines[0][o].l + 1;
       o += 1;
-    } while (o < lines[0].size () && lines[0][o].l != ~0);
+    } while (o < lines[0].size () && lines[0][o].l != ~0u);
 
     // Now, o - 1 is the line number of the last matched old line, and
     // n - 1 is the line number of the last matched new line.  We want
@@ -696,7 +777,7 @@ void pass2 ()
     // Finally, attempt to add unmatched lines to the preceeding
     // matched set.
 
-    for (; o < lines[0].size () && lines[0][o].l == ~0; o += 1, n += 1) {
+    for (; o < lines[0].size () && lines[0][o].l == ~0u; o += 1, n += 1) {
 
       // If the [next] pair of old and new lines aren't the same line, we're done.
 
@@ -717,7 +798,7 @@ void pass2 ()
       if (oL != oldCopies.end ()) {
         oldCopies.erase (oL);
       }
-      list<unsigned> &newCopies = line->copies[0];
+      list<unsigned> &newCopies = line->copies[1];
       list<unsigned>::iterator nL = find (newCopies.begin (), newCopies.end (), n);
       if (nL != newCopies.end ()) {
         newCopies.erase (nL);
@@ -732,7 +813,7 @@ void pass2 ()
 
   // Let's see the intermediate results.
 
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr,
              " found %u/%u matched lines/blocks (%u/%u totals).\n",
              nMatchedLines,
@@ -741,16 +822,8 @@ void pass2 ()
              nTotalMatchedBlocks
             );
     fflush (stderr);
-    if (2 < optVerbose) {
-      for (int f = 0; f < 2; f += 1) {
-        fprintf (stderr, "# file #%d\n", f + 1);
-        fflush (stderr);
-        for (int l = 0; l < lines[f].size (); l += 1) {
-          fprintf (stderr, "#   [%d] ", l);
-          fflush (stderr);
-          lines[f][l].Dump (stderr);
-        }
-      }
+    if (2 < opt_d_Debug) {
+      DumpFilesLines ();
     }
   }
 }
@@ -760,7 +833,7 @@ void pass2 ()
 
 void pass3 ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #3 (spreading matches up)...");
     fflush (stderr);
   }
@@ -774,7 +847,7 @@ void pass3 ()
 
     // ... skip any currently unmatched lines...
 
-    if (lines[0][o].l == ~0) {
+    if (lines[0][o].l == ~0u) {
       continue;
     }
 
@@ -786,7 +859,7 @@ void pass3 ()
     do {
       n = lines[0][o].l - 1;
       o -= 1;
-    } while (0 <= o && lines[0][o].l != ~0);
+    } while (0 <= o && lines[0][o].l != ~0u);
 
     // Now, o + 1 is the line number of the last matched old line, and
     // n + 1 is the line number of the last matched new line.  We want
@@ -795,7 +868,7 @@ void pass3 ()
     // Finally, attempt to add unmatched lines to the preceeding
     // matched set.
 
-    for (; 0 <= o && lines[0][o].l == ~0; o -= 1, n -= 1) {
+    for (; 0 <= o && lines[0][o].l == ~0u; o -= 1, n -= 1) {
 
       // If the [next] pair of old and new lines aren't the same line, we're done.
 
@@ -816,7 +889,7 @@ void pass3 ()
       if (oL != oldCopies.end ()) {
         oldCopies.erase (oL);
       }
-      list<unsigned> &newCopies = line->copies[0];
+      list<unsigned> &newCopies = line->copies[1];
       list<unsigned>::iterator nL = find (newCopies.begin (), newCopies.end (), n);
       if (nL != newCopies.end ()) {
         newCopies.erase (nL);
@@ -830,7 +903,7 @@ void pass3 ()
 
   // Let's see the intermediate results.
 
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr,
              " found %u/%u matched lines/blocks (%u/%u totals).\n",
              nMatchedLines,
@@ -840,16 +913,8 @@ void pass3 ()
             );
     fflush (stderr);
 
-    if (2 < optVerbose) {
-      for (int f = 0; f < 2; f += 1) {
-        fprintf (stderr, "# file #%d\n", f + 1);
-        fflush (stderr);
-        for (int l = 0; l < lines[f].size (); l += 1) {
-          fprintf (stderr, "#   [%d] ", l);
-          fflush (stderr);
-          lines[f][l].Dump (stderr);
-        }
-      }
+    if (2 < opt_d_Debug) {
+      DumpFilesLines ();
     }
   }
 }
@@ -860,7 +925,7 @@ void pass3 ()
 
 void pass4 ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass 4 (finding remaining matches amongst unique lines)...");
     fflush (stderr);
   }
@@ -900,20 +965,12 @@ void pass4 ()
 
   // Let's see the intermediate results.
 
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, " found %u matched lines (%u total).\n", nMatchedLines, nTotalMatchedLines);
     fflush (stderr);
 
-    if (2 < optVerbose) {
-      for (int f = 0; f < 2; f += 1) {
-        fprintf (stderr, "# file #%d\n", f + 1);
-        fflush (stderr);
-        for (int l = 0; l < lines[f].size (); l += 1) {
-          fprintf (stderr, "#   [%d] ", l);
-          fflush (stderr);
-          lines[f][l].Dump (stderr);
-        }
-      }
+    if (2 < opt_d_Debug) {
+      DumpFilesLines ();
     }
   }
 }
@@ -925,7 +982,7 @@ void pass4 ()
 
 void pass5 ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #5 (unmatching block moves)...\n");
     fflush (stderr);
   }
@@ -956,14 +1013,14 @@ void pass5 ()
     // 2 | d | 3 | d |
     //   +---+   +---+
 
-    while (o < lines[0].size () && lines[0][o].l == ~0) {
+    while (o < lines[0].size () && lines[0][o].l == ~0u) {
       o += 1;
     }
 
     // Skip any unmatched lines at this point in the new file.  These
     // are inserts.
 
-    while (n < lines[1].size () && lines[1][n].l == ~0) {
+    while (n < lines[1].size () && lines[1][n].l == ~0u) {
       n += 1;
     }
 
@@ -1045,17 +1102,17 @@ void pass5 ()
 
     // if (bSize <= bMove) {
       for (unsigned a = oOld; a < o; a += 1) {
-        lines[0][a].l = ~0;
+        lines[0][a].l = ~0u;
       }
       for (unsigned d = nNew; d < n; d += 1) {
-        lines[1][d].l = ~0;
+        lines[1][d].l = ~0u;
       }
     // } else {
       // for (unsigned a = oOld; a < o; a += 1) {
-      //   lines[0][a].l = ~0;
+      //   lines[0][a].l = ~0u;
       // }
       // for (unsigned d = nNew; d < n; d += 1) {
-      //   lines[1][d].l = ~0;
+      //   lines[1][d].l = ~0u;
       // }
     // }
 
@@ -1068,7 +1125,7 @@ void pass5 ()
 
   // Let's see the intermediate results.
 
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr,
              " found %u/%u matched lines/blocks (%u/%u totals).\n",
              nMatchedLines,
@@ -1078,16 +1135,8 @@ void pass5 ()
             );
     fflush (stderr);
 
-    if (2 < optVerbose) {
-      for (int f = 0; f < 2; f += 1) {
-        fprintf (stderr, "# file #%d\n", f + 1);
-        fflush (stderr);
-        for (int l = 0; l < lines[f].size (); l += 1) {
-          fprintf (stderr, "#   [%d] ", l);
-          fflush (stderr);
-          lines[f][l].Dump (stderr);
-        }
-      }
+    if (2 < opt_d_Debug) {
+      DumpFilesLines ();
     }
   }
 }
@@ -1155,12 +1204,10 @@ template<typename T> T max (T l, T r) {
 }
 
 void pass6c () {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #6c (walking the differences)...\n");
     fflush (stderr);
   }
-
-  nMatchedLines = 0;
 
   // Write the header.
 
@@ -1169,17 +1216,24 @@ void pass6c () {
 
   // Starting at the top of both files,...
 
-  unsigned o = 0;
-  unsigned n = 0;
+  unsigned o = 1;
+  unsigned oEoF = lines[0].size () - 1;
+  unsigned n = 1;
+  unsigned nEoF = lines[1].size () - 1;
 
-  while (o < lines[0].size () || n < lines[1].size ()) {
+  while (o < oEoF || n < nEoF) {
+    if (3 < opt_d_Debug) {
+      DumpFileLine (0, o);
+      DumpFileLine (1, n);
+    }
 
     // Find the bounds of the current contextual 'window'.
 
     // If we aren't looking at a delete or an insert, we're not at the
     // start of a context window.
 
-    if (lines[0][o].l != ~0 && lines[1][n].l != ~0) {
+    if (lines[0][o].l != ~0u && lines[1][n].l != ~0u) {
+      assert (lines[0][o].line == lines[1][n].line);
       o += 1;
       n += 1;
       continue;
@@ -1191,7 +1245,7 @@ void pass6c () {
     int boOldWindow = max (0, int (o) - int (opt_C_LinesOfCopyContext));
     int boNewWindow = max (0, int (n) - int (opt_C_LinesOfCopyContext));
 
-    if (1 < optVerbose) {
+    if (1 < opt_d_Debug) {
       fprintf (stderr, "boOldWindow = %d, boNewWindow = %d\n", boOldWindow, boNewWindow);
       fflush (stderr);
     }
@@ -1202,16 +1256,22 @@ void pass6c () {
     int eoNewWindow;
 
     bool widenWindow = true;
-    while (widenWindow && o < lines[0].size () || n < lines[1].size ()) {
+    while (widenWindow && o < oEoF || n < nEoF) {
 
       // Skip over the delete(s) and/or insert(s) defining the current
       // context.
 
-      while (o < lines[0].size () && lines[0][o].l == ~0) {
+      while (o < oEoF && lines[0][o].l == ~0u) {
         o += 1;
+        if (3 < opt_d_Debug) {
+          DumpFileLine (0, o);
+        }
       }
-      while (n < lines[1].size () && lines[1][n].l == ~0) {
+      while (n < nEoF && lines[1][n].l == ~0u) {
         n += 1;
+        if (3 < opt_d_Debug) {
+          DumpFileLine (1, n);
+        }
       }
 
       // This context will end opt_C_LinesOfCopyContext matched lines past the
@@ -1219,14 +1279,21 @@ void pass6c () {
 
       widenWindow = false;
       for (unsigned l = 0; !widenWindow && l < opt_C_LinesOfCopyContext; l += 1) {
-        if (o < lines[0].size ()) {
-          widenWindow |= lines[0][o].l == ~0;
+        if (o < oEoF) {
+          widenWindow |= lines[0][o].l == ~0u;
           o += 1;
+          if (3 < opt_d_Debug) {
+            DumpFileLine (0, o);
+          }
         }
-        if (n < lines[1].size ()) {
-          widenWindow |= lines[1][n].l == ~0;
+        if (n < nEoF) {
+          widenWindow |= lines[1][n].l == ~0u;
           n += 1;
+          if (3 < opt_d_Debug) {
+            DumpFileLine (1, n);
+          }
         }
+        assert (widenWindow || lines[0][o].line == lines[1][n].line);
       }
 
       eoOldWindow = o;
@@ -1237,21 +1304,28 @@ void pass6c () {
 
       if (!widenWindow) {
         for (unsigned l = 0; l < (2 * opt_C_LinesOfCopyContext + 1); l += 1) {
-          if (o < lines[0].size ()) {
-            widenWindow |= lines[0][o].l == ~0;
+          if (o < oEoF) {
+            widenWindow |= lines[0][o].l == ~0u;
             o += 1;
+            if (3 < opt_d_Debug) {
+              DumpFileLine (0, o);
+            }
           }
-          if (n < lines[1].size ()) {
-            widenWindow |= lines[1][n].l == ~0;
+          if (n < nEoF) {
+            widenWindow |= lines[1][n].l == ~0u;
             n += 1;
+            if (3 < opt_d_Debug) {
+              DumpFileLine (1, n);
+            }
           }
+          assert (widenWindow || lines[0][o].line == lines[1][n].line);
         }
       }
     }
 
     // We've found the end of the window.
 
-    if (1 < optVerbose) {
+    if (1 < opt_d_Debug) {
       fprintf (stderr, "eoOldWindow = %d, eoNewWindow = %d\n", eoOldWindow, eoNewWindow);
       fflush (stderr);
     }
@@ -1261,7 +1335,7 @@ void pass6c () {
     // file part, then for the new file part.
 
     fprintf (stdout, "***************\n");
-    fprintf (stdout, "*** %d,%d ****\n", boOldWindow + 1, eoOldWindow);
+    fprintf (stdout, "*** %d,%d ****\n", boOldWindow, eoOldWindow - 1);
 
     o = boOldWindow;
     n = boNewWindow;
@@ -1272,7 +1346,7 @@ void pass6c () {
       // are deletes.
 
       unsigned boDeletes = o;
-      while (o < eoOldWindow && lines[0][o].l == ~0) {
+      while (o < eoOldWindow && lines[0][o].l == ~0u) {
         o += 1;
       }
 
@@ -1280,7 +1354,7 @@ void pass6c () {
       // are inserts.
 
       unsigned boInserts = n;
-      while (n < eoNewWindow && lines[1][n].l == ~0) {
+      while (n < eoNewWindow && lines[1][n].l == ~0u) {
         n += 1;
       }
 
@@ -1310,12 +1384,14 @@ void pass6c () {
 
       // When we get here, we're dealing with matching lines.
 
+      assert (lines[0][o].line == lines[1][n].line);
+
       fprintf (stdout, "  %s\n", lines[0][o].line->c_str ());
       o += 1;
       n += 1;
     }
 
-    fprintf (stdout, "--- %d,%d ----\n", boNewWindow + 1, eoNewWindow);
+    fprintf (stdout, "--- %d,%d ----\n", boNewWindow, eoNewWindow - 1);
 
     o = boOldWindow;
     n = boNewWindow;
@@ -1326,7 +1402,7 @@ void pass6c () {
       // are deletes.
 
       unsigned boDeletes = o;
-      while (o < eoOldWindow && lines[0][o].l == ~0) {
+      while (o < eoOldWindow && lines[0][o].l == ~0u) {
         o += 1;
       }
 
@@ -1334,7 +1410,7 @@ void pass6c () {
       // are inserts.
 
       unsigned boInserts = n;
-      while (n < eoNewWindow && lines[1][n].l == ~0) {
+      while (n < eoNewWindow && lines[1][n].l == ~0u) {
         n += 1;
       }
 
@@ -1364,6 +1440,8 @@ void pass6c () {
 
       // When we get here, we're dealing with matching lines.
 
+      assert (lines[0][o].line == lines[1][n].line);
+
       fprintf (stdout, "  %s\n", lines[1][n].line->c_str ());
       o += 1;
       n += 1;
@@ -1388,41 +1466,47 @@ void pass6i () {
 
 void pass6n ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #6n (walking the differences)...\n");
     fflush (stderr);
   }
-
-  nMatchedLines = 0;
 
   // Write the header.  (None for normal.)
 
   // Starting at the top of both files,...
 
-  unsigned o = 0;
-  unsigned n = 0;
+  unsigned o = 1;
+  unsigned oEoF = lines[0].size () - 1;
+  unsigned n = 1;
+  unsigned nEoF = lines[1].size () - 1;
 
-  while (o < lines[0].size () || n < lines[1].size ()) {
+  while (o < oEoF || n < nEoF) {
+    if (3 < opt_d_Debug) {
+      DumpFileLine (0, o);
+      DumpFileLine (1, n);
+    }
 
     // Find any unmatched lines at this point in the old file.  These
     // are deletes.
 
-    unsigned boDeletes;
-    for (boDeletes = o;
-         o < lines[0].size () && lines[0][o].l == ~0;
-         o += 1
-        )
-    {}
+    unsigned boDeletes = o;
+    while (o < oEoF && lines[0][o].l == ~0u) {
+      o += 1;
+      if (3 < opt_d_Debug) {
+        DumpFileLine (0, o);
+      }
+    }
 
     // Find any unmatched lines at this point in the new file.  These
     // are inserts.
 
-    unsigned boInserts;
-    for (boInserts = n;
-         n < lines[1].size () && lines[1][n].l == ~0;
-         n += 1
-        )
-    {}
+    unsigned boInserts = n;
+    while (n < nEoF && lines[1][n].l == ~0u) {
+      n += 1;
+      if (3 < opt_d_Debug) {
+        DumpFileLine (1, n);
+      }
+    }
 
     // We've got deleted line(s) from boDeletes .. o.
     // We've got deleted line(s) from boInserts .. n.
@@ -1437,11 +1521,11 @@ void pass6n ()
       // ... deletes and inserts.
 
       if (1 < nDeletes && 1 < nInserts) {
-        fprintf (stdout, "%d,%dc%d,%d\n", boDeletes + 1, o, boInserts + 1, n);
+        fprintf (stdout, "%d,%dc%d,%d\n", boDeletes, o - 1, boInserts, n - 1);
       } else if (1 < nDeletes) {
-        fprintf (stdout, "%d,%dc%d\n", boDeletes + 1, o, boInserts + 1);
+        fprintf (stdout, "%d,%dc%d\n", boDeletes, o - 1, boInserts);
       } else if (1 < nInserts) {
-        fprintf (stdout, "%dc%d,%d\n", boDeletes + 1, boInserts + 1, n);
+        fprintf (stdout, "%dc%d,%d\n", boDeletes, boInserts, n - 1);
       } 
       for (unsigned l = boDeletes; l < o; l += 1) {
         fprintf (stdout, "< %s\n", lines[0][l].line->c_str ());
@@ -1455,9 +1539,9 @@ void pass6n ()
       //  ... just deletes.
 
       if (1 < nDeletes) {
-        fprintf (stdout, "%d,%dd%d\n", boDeletes + 1, o, n);
+        fprintf (stdout, "%d,%dd%d\n", boDeletes, o - 1, n - 1);
       } else {
-        fprintf (stdout, "%dd%d\n", boDeletes + 1, n);
+        fprintf (stdout, "%dd%d\n", boDeletes, n - 1);
       }
       for (unsigned l = boDeletes; l < o; l += 1) {
         fprintf (stdout, "< %s\n", lines[0][l].line->c_str ());
@@ -1467,9 +1551,9 @@ void pass6n ()
       //  ... just inserts.
 
       if (1 < nInserts) {
-        fprintf (stdout, "%da%d,%d\n", o, boInserts + 1, n);
+        fprintf (stdout, "%da%d,%d\n", o - 1, boInserts, n - 1);
       } else {
-        fprintf (stdout, "%da%d\n", o, boInserts + 1);
+        fprintf (stdout, "%da%d\n", o - 1, boInserts);
       }
       for (unsigned l = boInserts; l < n; l += 1) {
         fprintf (stdout, "> %s\n", lines[1][l].line->c_str ());
@@ -1478,8 +1562,14 @@ void pass6n ()
 
     // When we get here, we're dealing with matching lines.
 
-    o += 1;
-    n += 1;
+    assert (lines[0][o].line == lines[1][n].line);
+
+    if (o < oEoF) {
+      o += 1;
+    }
+    if (n < nEoF) {
+      n += 1;
+    }
   }
 }
 
@@ -1495,45 +1585,51 @@ void pass6s () {
 
 void pass6u ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #6u (walking the differences)...\n");
     fflush (stderr);
   }
-
-  nMatchedLines = 0;
 
   // Write the header.
 
   fprintf (stdout, "--- %s\t%s\n", files[0], "0000-00-00 00:00:00.000000000 +0000");
   fprintf (stdout, "+++ %s\t%s\n", files[1], "0000-00-00 00:00:00.000000000 +0000");
-  fprintf (stdout, "@@ -1,%d +1,%d @@\n", lines[0].size (), lines[1].size ());
+  fprintf (stdout, "@@ -1,%d +1,%d @@\n", lines[0].size () - 2, lines[1].size () - 2);
 
   // Starting at the top of both files,...
 
-  unsigned o = 0;
-  unsigned n = 0;
+  unsigned o = 1;
+  unsigned oEoF = lines[0].size () - 1;
+  unsigned n = 1;
+  unsigned nEoF = lines[1].size () - 1;
 
-  while (o < lines[0].size () || n < lines[1].size ()) {
+  while (o < oEoF || n < nEoF) {
+    if (3 < opt_d_Debug) {
+      DumpFileLine (0, o);
+      DumpFileLine (1, n);
+    }
 
     // Find any unmatched lines at this point in the old file.  These
     // are deletes.
 
-    unsigned boDeletes;
-    for (boDeletes = o;
-         o < lines[0].size () && lines[0][o].l == ~0;
-         o += 1
-        )
-    {}
+    unsigned boDeletes = o;
+    while (o < oEoF && lines[0][o].l == ~0u) {
+      o += 1;
+      if (3 < opt_d_Debug) {
+        DumpFileLine (0, o);
+      }
+    }
 
     // Find any unmatched lines at this point in the new file.  These
     // are inserts.
 
-    unsigned boInserts;
-    for (boInserts = n;
-         n < lines[1].size () && lines[1][n].l == ~0;
-         n += 1
-        )
-    {}
+    unsigned boInserts = n;
+    while (n < nEoF && lines[1][n].l == ~0u) {
+      n += 1;
+      if (3 < opt_d_Debug) {
+        DumpFileLine (1, n);
+      }
+    }
 
     // We've got deleted line(s) from boDeletes .. o.
     // We've got deleted line(s) from boInserts .. n.
@@ -1571,15 +1667,22 @@ void pass6u ()
 
     // When we get here, we're dealing with matching lines.
 
+    assert (lines[0][o].line == lines[1][n].line);
+
     fprintf (stdout, " %s\n", lines[0][o].line->c_str ());
-    o += 1;
-    n += 1;
+
+    if (o < oEoF) {
+      o += 1;
+    }
+    if (n < nEoF) {
+      n += 1;
+    }
   }
 }
 
 void pass6y ()
 {
-  if (0 < optVerbose) {
+  if (0 < opt_d_Debug) {
     fprintf (stderr, "# Pass #6y (walking the differences)...\n");
     fflush (stderr);
   }
@@ -1592,25 +1695,37 @@ void pass6y ()
 
   int columnWidth = (opt_W_MaxPrintColumns - 7) / 2;
 
-  unsigned o = 0;
-  unsigned n = 0;
+  unsigned o = 1;
+  unsigned oEoF = lines[0].size () - 1;
+  unsigned n = 1;
+  unsigned nEoF = lines[1].size () - 1;
 
-  while (o < lines[0].size () || n < lines[1].size ()) {
+  while (o < oEoF || n < nEoF) {
+    if (3 < opt_d_Debug) {
+      DumpFileLine (0, o);
+      DumpFileLine (1, n);
+    }
 
     // Find any unmatched lines at this point in the old file.  These
     // are deletes.
 
     unsigned boDeletes = o;
-    while (o < lines[0].size () && lines[0][o].l == ~0) {
+    while (o < oEoF && lines[0][o].l == ~0u) {
       o += 1;
+      if (3 < opt_d_Debug) {
+        DumpFileLine (0, o);
+      }
     }
 
     // Find any unmatched lines at this point in the new file.  These
     // are inserts.
 
     unsigned boInserts = n;
-    while (n < lines[1].size () && lines[1][n].l == ~0) {
+    while (n < nEoF && lines[1][n].l == ~0u) {
       n += 1;
+      if (3 < opt_d_Debug) {
+        DumpFileLine (1, n);
+      }
     }
 
     // We've got deleted line(s) from boDeletes .. o.
@@ -1662,13 +1777,20 @@ void pass6y ()
 
     // When we get here, we're dealing with matching lines.
 
+    assert (lines[0][o].line == lines[1][n].line);
+
     fprintf (stdout,
              "%-*s   %s\n",
              columnWidth,
              lines[0][o].line->substr (0, columnWidth).c_str (),
              lines[1][n].line->substr (0, columnWidth).c_str ()
             );
-    o += 1;
-    n += 1;
+
+    if (o < oEoF) {
+      o += 1;
+    }
+    if (n < nEoF) {
+      n += 1;
+    }
   }
 }
