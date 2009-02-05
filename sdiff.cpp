@@ -720,6 +720,11 @@ void pass1 ()
 
         l->copies[0].pop_front ();
         l->copies[1].pop_front ();
+
+        if (2 < opt_d_Debug) {
+          DumpFileLine (0, o);
+          DumpFileLine (1, n);
+        }
       }
     }
   }
@@ -731,7 +736,7 @@ void pass1 ()
     fprintf (stderr, " found %u matched lines (%u total).\n", nMatchedLines, nTotalMatchedLines);
     fflush (stderr);
 
-    if (2 < opt_d_Debug) {
+    if (3 < opt_d_Debug) {
       DumpFilesLines ();
     }
   }
@@ -754,6 +759,10 @@ void pass2 ()
 
   for (unsigned o = 0; o < lines[0].size (); o += 1) {
 
+    if (2 < opt_d_Debug) {
+      DumpFileLine (0, o);
+    }
+
     // ... skip any currently unmatched lines...
 
     if (lines[0][o].l == ~0u) {
@@ -768,6 +777,11 @@ void pass2 ()
     do {
       n = lines[0][o].l + 1;
       o += 1;
+
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+        DumpFileLine (1, n);
+      }
     } while (o < lines[0].size () && lines[0][o].l != ~0u);
 
     // Now, o - 1 is the line number of the last matched old line, and
@@ -804,6 +818,10 @@ void pass2 ()
         newCopies.erase (nL);
       }
 
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+        DumpFileLine (1, n);
+      }
       nMatchedLines += 1;
     }
     nMatchedBlocks += 1;
@@ -822,7 +840,7 @@ void pass2 ()
              nTotalMatchedBlocks
             );
     fflush (stderr);
-    if (2 < opt_d_Debug) {
+    if (3 < opt_d_Debug) {
       DumpFilesLines ();
     }
   }
@@ -845,6 +863,10 @@ void pass3 ()
 
   for (int o = lines[0].size (); 0 <= o; o -= 1) {
 
+    if (2 < opt_d_Debug) {
+      DumpFileLine (0, o);
+    }
+
     // ... skip any currently unmatched lines...
 
     if (lines[0][o].l == ~0u) {
@@ -859,6 +881,11 @@ void pass3 ()
     do {
       n = lines[0][o].l - 1;
       o -= 1;
+
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+        DumpFileLine (1, n);
+      }
     } while (0 <= o && lines[0][o].l != ~0u);
 
     // Now, o + 1 is the line number of the last matched old line, and
@@ -895,6 +922,10 @@ void pass3 ()
         newCopies.erase (nL);
       }
 
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+        DumpFileLine (1, n);
+      }
       nMatchedLines += 1;
     }
     nMatchedBlocks += 1;
@@ -913,7 +944,7 @@ void pass3 ()
             );
     fflush (stderr);
 
-    if (2 < opt_d_Debug) {
+    if (3 < opt_d_Debug) {
       DumpFilesLines ();
     }
   }
@@ -959,6 +990,11 @@ void pass4 ()
 
       l->copies[0].pop_front ();
       l->copies[1].pop_front ();
+
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+        DumpFileLine (1, n);
+      }
     }
   }
   nTotalMatchedLines += nMatchedLines;
@@ -969,7 +1005,7 @@ void pass4 ()
     fprintf (stderr, " found %u matched lines (%u total).\n", nMatchedLines, nTotalMatchedLines);
     fflush (stderr);
 
-    if (2 < opt_d_Debug) {
+    if (3 < opt_d_Debug) {
       DumpFilesLines ();
     }
   }
@@ -997,6 +1033,11 @@ void pass5 ()
 
   while (o < lines[0].size () || n < lines[1].size ()) {
 
+    if (2 < opt_d_Debug) {
+      DumpFileLine (0, o);
+      DumpFileLine (1, n);
+    }
+
     // Skip any unmatched lines at this point in the old file.  These
     // are deletes.
 
@@ -1015,6 +1056,10 @@ void pass5 ()
 
     while (o < lines[0].size () && lines[0][o].l == ~0u) {
       o += 1;
+
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+      }
     }
 
     // Skip any unmatched lines at this point in the new file.  These
@@ -1022,6 +1067,10 @@ void pass5 ()
 
     while (n < lines[1].size () && lines[1][n].l == ~0u) {
       n += 1;
+
+      if (2 < opt_d_Debug) {
+        DumpFileLine (1, n);
+      }
     }
 
     // When we get here, we know that we're dealing with matching
@@ -1041,6 +1090,11 @@ void pass5 ()
     if (lines[0][o].l == n) {
       o += 1;
       n += 1;
+
+      if (2 < opt_d_Debug) {
+        DumpFileLine (0, o);
+        DumpFileLine (1, n);
+      }
       continue;
     }
 
@@ -1103,9 +1157,17 @@ void pass5 ()
     // if (bSize <= bMove) {
       for (unsigned a = oOld; a < o; a += 1) {
         lines[0][a].l = ~0u;
+
+        if (2 < opt_d_Debug) {
+          DumpFileLine (0, o);
+        }
       }
       for (unsigned d = nNew; d < n; d += 1) {
         lines[1][d].l = ~0u;
+
+        if (2 < opt_d_Debug) {
+          DumpFileLine (1, n);
+        }
       }
     // } else {
       // for (unsigned a = oOld; a < o; a += 1) {
@@ -1135,7 +1197,7 @@ void pass5 ()
             );
     fflush (stderr);
 
-    if (2 < opt_d_Debug) {
+    if (3 < opt_d_Debug) {
       DumpFilesLines ();
     }
   }
@@ -1222,7 +1284,8 @@ void pass6c () {
   unsigned nEoF = lines[1].size () - 1;
 
   while (o < oEoF || n < nEoF) {
-    if (3 < opt_d_Debug) {
+
+    if (2 < opt_d_Debug) {
       DumpFileLine (0, o);
       DumpFileLine (1, n);
     }
@@ -1263,13 +1326,15 @@ void pass6c () {
 
       while (o < oEoF && lines[0][o].l == ~0u) {
         o += 1;
-        if (3 < opt_d_Debug) {
+
+        if (2 < opt_d_Debug) {
           DumpFileLine (0, o);
         }
       }
       while (n < nEoF && lines[1][n].l == ~0u) {
         n += 1;
-        if (3 < opt_d_Debug) {
+
+        if (2 < opt_d_Debug) {
           DumpFileLine (1, n);
         }
       }
@@ -1282,14 +1347,16 @@ void pass6c () {
         if (o < oEoF) {
           widenWindow |= lines[0][o].l == ~0u;
           o += 1;
-          if (3 < opt_d_Debug) {
+
+          if (2 < opt_d_Debug) {
             DumpFileLine (0, o);
           }
         }
         if (n < nEoF) {
           widenWindow |= lines[1][n].l == ~0u;
           n += 1;
-          if (3 < opt_d_Debug) {
+
+          if (2 < opt_d_Debug) {
             DumpFileLine (1, n);
           }
         }
@@ -1307,14 +1374,16 @@ void pass6c () {
           if (o < oEoF) {
             widenWindow |= lines[0][o].l == ~0u;
             o += 1;
-            if (3 < opt_d_Debug) {
+
+            if (2 < opt_d_Debug) {
               DumpFileLine (0, o);
             }
           }
           if (n < nEoF) {
             widenWindow |= lines[1][n].l == ~0u;
             n += 1;
-            if (3 < opt_d_Debug) {
+
+            if (2 < opt_d_Debug) {
               DumpFileLine (1, n);
             }
           }
@@ -1481,7 +1550,8 @@ void pass6n ()
   unsigned nEoF = lines[1].size () - 1;
 
   while (o < oEoF || n < nEoF) {
-    if (3 < opt_d_Debug) {
+
+    if (2 < opt_d_Debug) {
       DumpFileLine (0, o);
       DumpFileLine (1, n);
     }
@@ -1492,7 +1562,8 @@ void pass6n ()
     unsigned boDeletes = o;
     while (o < oEoF && lines[0][o].l == ~0u) {
       o += 1;
-      if (3 < opt_d_Debug) {
+
+      if (2 < opt_d_Debug) {
         DumpFileLine (0, o);
       }
     }
@@ -1503,7 +1574,8 @@ void pass6n ()
     unsigned boInserts = n;
     while (n < nEoF && lines[1][n].l == ~0u) {
       n += 1;
-      if (3 < opt_d_Debug) {
+
+      if (2 < opt_d_Debug) {
         DumpFileLine (1, n);
       }
     }
@@ -1604,7 +1676,8 @@ void pass6u ()
   unsigned nEoF = lines[1].size () - 1;
 
   while (o < oEoF || n < nEoF) {
-    if (3 < opt_d_Debug) {
+
+    if (2 < opt_d_Debug) {
       DumpFileLine (0, o);
       DumpFileLine (1, n);
     }
@@ -1615,7 +1688,8 @@ void pass6u ()
     unsigned boDeletes = o;
     while (o < oEoF && lines[0][o].l == ~0u) {
       o += 1;
-      if (3 < opt_d_Debug) {
+
+      if (2 < opt_d_Debug) {
         DumpFileLine (0, o);
       }
     }
@@ -1626,7 +1700,8 @@ void pass6u ()
     unsigned boInserts = n;
     while (n < nEoF && lines[1][n].l == ~0u) {
       n += 1;
-      if (3 < opt_d_Debug) {
+
+      if (2 < opt_d_Debug) {
         DumpFileLine (1, n);
       }
     }
@@ -1701,7 +1776,8 @@ void pass6y ()
   unsigned nEoF = lines[1].size () - 1;
 
   while (o < oEoF || n < nEoF) {
-    if (3 < opt_d_Debug) {
+
+    if (2 < opt_d_Debug) {
       DumpFileLine (0, o);
       DumpFileLine (1, n);
     }
@@ -1712,7 +1788,8 @@ void pass6y ()
     unsigned boDeletes = o;
     while (o < oEoF && lines[0][o].l == ~0u) {
       o += 1;
-      if (3 < opt_d_Debug) {
+
+      if (2 < opt_d_Debug) {
         DumpFileLine (0, o);
       }
     }
@@ -1723,7 +1800,8 @@ void pass6y ()
     unsigned boInserts = n;
     while (n < nEoF && lines[1][n].l == ~0u) {
       n += 1;
-      if (3 < opt_d_Debug) {
+
+      if (2 < opt_d_Debug) {
         DumpFileLine (1, n);
       }
     }
