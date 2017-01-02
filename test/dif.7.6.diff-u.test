@@ -1,0 +1,139 @@
+sdiff: sdiff.cpp:1745: void pass6u(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+--- dif.7.cpp	0000-00-00 00:00:00.000000000 +0000
++++ dif.6.cpp	0000-00-00 00:00:00.000000000 +0000
+@@ -1,1252 +1,1088 @@
+ #include <algorithm>
+ using std::find;
+ #include <string>
+ using std::string;
+ #include <list>
+ using std::list;
+ #include <map>
+ using std::map;
+ #include <vector>
+ using std::vector;
+ #include <stdio.h>
+ 
+ enum DiffFormat {
+   Default,
+ 
+   Context,
+   EdScript,
+   IfThenElse,
+   Normal,
+   RCS,
+   SideBySide,
+   Unified
+ };
+ 
+-DiffFormat diffFormat = SideBySide;
+-
++DiffFormat diffFormat = Context;
+ unsigned optCopyContext = 3;
+-unsigned optPageWidth = 130;
+-unsigned optVerbose = 2;
++
++int optVerbose = 1;
+ 
+ struct Line : public string {
+   Line (string _text) :
+     string (_text)
+   {
+   }
+   ~Line () {
+     copies[0].erase (copies[0].begin (), copies[0].end ());
+     copies[1].erase (copies[1].begin (), copies[1].end ());
+   }
+   void Dump (FILE *out) {
+     fprintf (out, "{{ ");
+     for (list<unsigned>::iterator i = copies[0].begin (); i != copies[0].end (); i++) {
+       fprintf (out, "%u ", *i);
+     }
+     fprintf (out, "},{ ");
+     for (list<unsigned>::iterator i = copies[1].begin (); i != copies[1].end (); i++) {
+       fprintf (out, "%u ", *i);
+     }
+-    fprintf (out, "}}\t%s\n", c_str ());
++    fprintf (out, "}}\t%s", c_str ());
+   }
+   list<unsigned> copies[2];
+ };
+ 
+ struct LinePtr {
+   LinePtr (Line *_line) :
+     line (_line),
+     l (~0u)
+   {
+   }
+   void Dump (FILE *out) {
+     fprintf (out, "[%d] ", l);
+     line->Dump (out);
+   }
+   Line *line;
+   unsigned l;
+ };
+ 
+ typedef map<string, Line *> MapStringToLinePtr;
+ typedef vector<LinePtr> VectorLinePtr;
+ 
+ // Our name.
+ 
+ char *ARGV0 = "dif3";
+ 
+ // The 'symbol' (line) table.
+ 
+ MapStringToLinePtr table;
+ 
+ // The names of the 2 files to be diff'd.
+ 
+ char const *files[2] = { 0, 0 };
+ 
+ // The lines of the 2 files to be diff'd.
+ 
+ VectorLinePtr lines[2];
+ 
+ // Miscellaneous metrics.
+ 
+ unsigned nTotalMatchedBlocks = 0;
+ unsigned nMatchedBlocks = 0;
+ unsigned nTotalMatchedLines = 0;
+ unsigned nMatchedLines = 0;
+ 
+ void pass1 ();
+ void pass2 ();
+ void pass3 ();
+ void pass4 ();
+ void pass5 ();
+ void pass6 ();
+ 
+ int main (int argc, char *argv[])
+ {
+   // Read the old [0] file, and the new [1] file.
+ 
+   for (int a = 1, n = 0; a < argc && n < 2; a += 1, n += 1) {
+     files[n] = argv[a];
+ 
+     if (FILE *f = fopen (files[n], "r")) {
+       if (0 < optVerbose) {
+         fprintf (stderr, "# Reading %s...", files[n]);
+-        fflush (stderr);
+       }
+ 
+       char buffer[1024];
+       unsigned nUniq = 0;
+ 
+       while (fgets (buffer, sizeof (buffer), f)) {
+         string text (buffer);
++
++        Line *line = table[text];
++
++        if (!line) {
++          table[text] = line = new Line (text);
++          nUniq += 1;
++        }
++        line->copies[n].push_back (lines[n].size ());
++        lines[n].push_back (line);
++      }
++
++      if (0 < optVerbose) {
++        fprintf (stderr, " %u lines, %u unique.\n", lines[n].size (), nUniq);

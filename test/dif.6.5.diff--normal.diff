@@ -1,0 +1,190 @@
+726,786c726,727
+<     // Find the bounds of the current contextual 'window'.
+< 
+<     // If we aren't looking at a delete or an insert, we're not at the
+<     // start of a context window.
+< 
+<     if (lines[0][o].l != ~0 && lines[1][n].l != ~0) {
+<       o += 1;
+<       n += 1;
+<       continue;
+<     }
+< 
+<     // We're looking at at least 1 delete or insert, so a window
+<     // begins here (or, rather, optCopyContext lines earlier).
+<     
+<     int boOldWindow = max (0, int (boDeletes) - int(optCopyContext));
+<     int eoOldWindow = min (int (lines[0].size ()), int(o) + int(optCopyContext));
+< 
+<     // Look for the end of the window.
+< 
+<     bool widenWindow = false;
+<     do {
+< 
+<       // Skip over the delete(s) and/or insert(s) defining the current
+<       // context.
+< 
+<       while (o < lines[0].size () && lines[0][o].l == ~0) {
+<         o += 1;
+<       }
+<       while (n < lines[1].size () && lines[1][n].l == ~0) {
+<         n += 1;
+<       }
+< 
+<       // ...  This context will end optCopyContext lines past the last
+<       // set of deletes or inserts we find.  However, since another
+<       // window could follow, we look 2 * optCopyContext ahead for
+<       // another delete or insert.
+< 
+<       for (unsigned l = 0; l < (2 * optCopyContext); i += 1) {
+<         if (o < lines[0].size ()) {
+<           if (widenWindow |= lines[0][o].l == ~0) {
+<             break;
+<           }
+<           o += 1;
+<         }
+<         if (n < lines[1].size ()) {
+<           if (widenWindow |= lines[1][o].l == ~0) {
+<             break;
+<           }
+<           n += 1;
+<         }
+<       }
+<     } while (widenWindow);
+< 
+<     // We've found the end of the window.
+< 
+<     int boNewWindow = max (0, int (boInserts) - int (optCopyContext));
+<     int eoNewWindow = min (int (lines[1].size ()), int(n) + int (optCopyContext));
+< 
+<     // Now, reset ourselves to the start of the window, and walk it to
+<     // produce the output.  We'll walk it twice, first for the old
+<     // file part, then for the new file part.
+---
+>     // Find any unmatched lines at this point in the old file.  These
+>     // are deletes.
+788,789c729,734
+<     fprintf (stdout, "***************\n");
+<     fprintf (stdout, "*** %d,%d ****\n", boOldWindow + 1, eoOldWindow + 1);
+---
+>     unsigned boDeletes;
+>     for (boDeletes = o;
+>          o < lines[0].size () && lines[0][o].l == ~0;
+>          o += 1
+>         )
+>     {}
+791,792c736,737
+<     o = boOldWindow;
+<     n = boNewWindow;
+---
+>     // Find any unmatched lines at this point in the new file.  These
+>     // are inserts.
+794c739,744
+<     while (o < eoOldWindow && n < eoNewWindow) {
+---
+>     unsigned boInserts;
+>     for (boInserts = n;
+>          n < lines[1].size () && lines[1][n].l == ~0;
+>          n += 1
+>         )
+>     {}
+796,797c746,747
+<       // Find any unmatched lines at this point in the old file.  These
+<       // are deletes.
+---
+>     // We've got deleted line(s) from boDeletes .. o.
+>     // We've got deleted line(s) from boInserts .. n.
+799,802c749,750
+<       unsigned boDeletes = o;
+<       while (o < eoOldWindow && lines[0][o].l == ~0) {
+<         o += 1;
+<       }
+---
+>     unsigned nDeletes = o - boDeletes;
+>     unsigned nInserts = n - boInserts;
+804,805c752
+<       // Find any unmatched lines at this point in the new file.  These
+<       // are inserts.
+---
+>     // Have we got anything?
+807,809c754,763
+<       unsigned boInserts = n;
+<       while (n < eoNewWindow && lines[1][n].l == ~0) {
+<         n += 1;
+---
+>     if (nDeletes || nInserts) {
+>       int boOldWindow = max (0, int (boDeletes) - int(optCopyContext));
+>       int eoOldWindow = min (int (lines[0].size ()), int(o) + int(optCopyContext));
+> 
+>       int boNewWindow = max (0, int (boInserts) - int (optCopyContext));
+>       int eoNewWindow = min (int (lines[1].size ()), int(n) + int (optCopyContext));
+> 
+>       fprintf (stdout, "***************\n*** %d,%d ****", boOldWindow, eoOldWindow);
+>       for (unsigned l = boOldWindow; l < boDeletes; l += 1) {
+>         fprintf (stdout, "  %s", lines[0][l].line->c_str ());
+812,817d765
+<       // We've got deleted line(s) from boDeletes .. o.
+<       // We've got deleted line(s) from boInserts .. n.
+< 
+<       unsigned nDeletes = o - boDeletes;
+<       unsigned nInserts = n - boInserts;
+< 
+836,855c784,785
+<       // When we get here, we're dealing with matching lines.
+< 
+<       fprintf (stdout, "  %s", lines[0][l].line->c_str ());
+<       o += 1;
+<       n += 1;
+<     }
+< 
+<     fprintf (stdout, "--- %d,%d ----\n", boNewWindow + 1, eoNewWindow + 1);
+< 
+<     o = boOldWindow;
+<     n = boNewWindow;
+< 
+<     while (o < eoOldWindow && n < eoNewWindow) {
+< 
+<       // Find any unmatched lines at this point in the old file.  These
+<       // are deletes.
+< 
+<       unsigned boDeletes = o;
+<       while (o < eoOldWindow && lines[0][o].l == ~0) {
+<         o += 1;
+---
+>       for (unsigned l = o; l < eoOldWindow; l += 1) {
+>         fprintf (stdout, "  %s", lines[0][l].line->c_str ());
+857,863c787,789
+< 
+<       // Find any unmatched lines at this point in the new file.  These
+<       // are inserts.
+< 
+<       unsigned boInserts = n;
+<       while (n < eoNewWindow && lines[1][n].l == ~0) {
+<         n += 1;
+---
+>       fprintf (stdout, "--- %d,%d ----", boNewWindow, eoNewWindow);
+>       for (unsigned l = boNewWindow; l < boInserts; l += 1) {
+>         fprintf (stdout, "  %s", lines[1][l].line->c_str ());
+866,871d791
+<       // We've got deleted line(s) from boDeletes .. o.
+<       // We've got deleted line(s) from boInserts .. n.
+< 
+<       unsigned nDeletes = o - boDeletes;
+<       unsigned nInserts = n - boInserts;
+< 
+890,894c810,812
+<       // When we get here, we're dealing with matching lines.
+< 
+<       fprintf (stdout, "  %s", lines[1][l].line->c_str ());
+<       o += 1;
+<       n += 1;
+---
+>       for (unsigned l = n; l < eoNewWindow; l += 1) {
+>         fprintf (stdout, "  %s", lines[1][l].line->c_str ());
+>       }
+895a814,818
+> 
+>     // When we get here, we're dealing with matching lines.
+> 
+>     o += 1;
+>     n += 1;

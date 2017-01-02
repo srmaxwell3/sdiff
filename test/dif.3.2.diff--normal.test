@@ -1,0 +1,9 @@
+sdiff: sdiff.cpp:1637: void pass6n(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+1,2d0
+< #include <algorithm>
+< using std::find;
+11a10,13
+> 
+> struct Line : public string {
+>   Line (string _text) :
+>     text (_text)

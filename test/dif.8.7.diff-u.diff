@@ -1,0 +1,589 @@
+--- dif.8.cpp	2008-02-26 01:32:31.000000000 +0000
++++ dif.7.cpp	2008-02-25 22:43:43.000000000 +0000
+@@ -9,46 +9,23 @@
+ #include <vector>
+ using std::vector;
+ #include <stdio.h>
+-#include <getopt.h>
+ 
+ enum DiffFormat {
+-  opt_D_IfThenElse,
+-  opt___Normal,
+-  opt_c_Context,
+-  opt_e_EdScript,
+-  opt_n_RCS,
+-  opt_u_Unified,
+-  opt_y_SideBySide
+-};
++  Default,
+ 
+-DiffFormat opt___OutputFormat = opt___Normal;
++  Context,
++  EdScript,
++  IfThenElse,
++  Normal,
++  RCS,
++  SideBySide,
++  Unified
++};
+ 
+-bool       opt_B_IgnoreBlankLines = false;
+-unsigned   opt_C_LinesOfCopyContext = 3;
+-string     opt_D_IfdefName;
+-bool       opt_E_IgnoreTabExpansionChanges = false;
+-string     opt_F_ShowMostRecentLineMatching;
+-string     opt_I_IgnoreLinesMatching;
+-bool       opt_N_TreatAbsentFilesAsEmpty = false;
+-string     opt_S_StartWithFileMatching;
+-bool       opt_T_PrependATab = false;
+-unsigned   opt_U_LinesOfUnifiedContext = 3;
+-unsigned   opt_W_MaxPrintColumns = 130;
+-string     opt_X_ExcludeFilesMatching;
+-bool       opt_a_TreatAllFilesAsText = false;
+-bool       opt_b_IgnoreWhitespaceChanges = false;
+-bool       opt_d_TryToFindMinimalChanges = false;
+-bool       opt_i_IgnoreCaseDifferences = false;
+-bool       opt_l_PaginateWithPr = false;
+-bool       opt_p_ShowChangedCFunction = false;
+-bool       opt_q_OutputOnlyIfFilesDiffer = false;
+-bool       opt_r_RecursivelyCompareSubdirectories = false;
+-bool       opt_s_ReportWhenFilesAreSame = false;
+-bool       opt_t_ExpandTabs = false;
+-bool       opt_v_ShowVersionInfo = false;
+-bool       opt_w_IgnoreAllWhitespace = false;
+-string     opt_x_IgnoreFilesMatching;
++DiffFormat diffFormat = SideBySide;
+ 
++unsigned optCopyContext = 3;
++unsigned optPageWidth = 130;
+ unsigned optVerbose = 2;
+ 
+ struct Line : public string {
+@@ -114,8 +91,6 @@
+ unsigned nTotalMatchedLines = 0;
+ unsigned nMatchedLines = 0;
+ 
+-void getopts (int argc, char const *const argv[]);
+-
+ void pass1 ();
+ void pass2 ();
+ void pass3 ();
+@@ -123,29 +98,11 @@
+ void pass5 ();
+ void pass6 ();
+ 
+-int main (int argc, char const *const argv[])
++int main (int argc, char *argv[])
+ {
+-  getopts (argc, argv);
+-
+-  if (opt_v_ShowVersionInfo) {
+-    fprintf
+-      (stderr,
+-       "diff () 0.0.1"
+-       "Copyright (C) 2008 Sidney R Maxwell III"
+-       ""
+-       "This program comes with NO WARRANTY, to the extent permitted by law."
+-       "You may redistribute copies of this program"
+-       "under the terms of the GNU General Public License."
+-       "For more information about these matters, see the file named COPYING."
+-       ""
+-       "Written by Sid Maxwell."
+-      );
+-    exit (0);
+-  }
+-
+   // Read the old [0] file, and the new [1] file.
+ 
+-  for (int a = optind, n = 0; a < argc && n < 2; a += 1, n += 1) {
++  for (int a = 1, n = 0; a < argc && n < 2; a += 1, n += 1) {
+     files[n] = argv[a];
+ 
+     if (FILE *f = fopen (files[n], "r")) {
+@@ -208,387 +165,6 @@
+   return 0;
+ }
+ 
+-// Usage: diff [OPTION]... FILES
+-// Compare files line by line.
+-// 
+-//   --GTYPE-group-format=GFMT  Similar, but format GTYPE input groups with GFMT.
+-//   --LTYPE-line-format=LFMT  Similar, but format LTYPE input lines with LFMT.
+-//     LTYPE is `old', `new', or `unchanged'.  GTYPE is LTYPE or `changed'.
+-//     GFMT may contain:
+-//       %<  lines from FILE1
+-//       %>  lines from FILE2
+-//       %=  lines common to FILE1 and FILE2
+-//       %[-][WIDTH][.[PREC]]{doxX}LETTER  printf-style spec for LETTER
+-//         LETTERs are as follows for new group, lower case for old group:
+-//           F  first line number
+-//           L  last line number
+-//           N  number of lines = L-F+1
+-//           E  F-1
+-//           M  L+1
+-//     LFMT may contain:
+-//       %L  contents of line
+-//       %l  contents of line, excluding any trailing newline
+-//       %[-][WIDTH][.[PREC]]{doxX}n  printf-style spec for input line number
+-//     Either GFMT or LFMT may contain:
+-//       %%  %
+-//       %c'C'  the single character C
+-//       %c'\OOO'  the character with octal code OOO
+-//
+-//   --brief  -q  Output only whether files differ.
+-//   --context[=NUM]  -c  -C NUM  Output NUM (default 3) lines of copied context.
+-//   --ed  -e  Output an ed script.
+-//   --exclude-from=FILE  -X FILE  Exclude files that match any pattern in FILE.
+-//   --exclude=PAT  -x PAT  Exclude files that match PAT.
+-//   --expand-tabs  -t  Expand tabs to spaces in output.
+-//   --from-file=FILE1  Compare FILE1 to all operands.  FILE1 can be a directory.
+-//   --help  Output this help.
+-//   --horizon-lines=NUM  Keep NUM lines of the common prefix and suffix.
+-//   --ifdef=NAME  -D NAME  Output merged file to show `#ifdef NAME' diffs.
+-//   --ignore-all-space  -w  Ignore all white space.
+-//   --ignore-blank-lines  -B  Ignore changes whose lines are all blank.
+-//   --ignore-case  -i  Ignore case differences in file contents.
+-//   --ignore-file-name-case  Ignore case when comparing file names.
+-//   --ignore-matching-lines=RE  -I RE  Ignore changes whose lines all match RE.
+-//   --ignore-space-change  -b  Ignore changes in the amount of white space.
+-//   --ignore-tab-expansion  -E  Ignore changes due to tab expansion.
+-//   --initial-tab  -T  Make tabs line up by prepending a tab.
+-//   --label LABEL  Use LABEL instead of file name.
+-//   --left-column  Output only the left column of common lines.
+-//   --line-format=LFMT  Similar, but format all input lines with LFMT.
+-//   --minimal  -d  Try hard to find a smaller set of changes.
+-//   --new-file  -N  Treat absent files as empty.
+-//   --no-ignore-file-name-case  Consider case when comparing file names.
+-//   --normal  Output a normal diff.
+-//   --paginate  -l  Pass the output through `pr' to paginate it.
+-//   --rcs  -n  Output an RCS format diff.
+-//   --recursive  -r  Recursively compare any subdirectories found.
+-//   --report-identical-files  -s  Report when two files are the same.
+-//   --show-c-function  -p  Show which C function each change is in.
+-//   --show-function-line=RE  -F RE  Show the most recent line matching RE.
+-//   --side-by-side  -y  Output in two columns.
+-//   --speed-large-files  Assume large files and many scattered small changes.
+-//   --starting-file=FILE  -S FILE  Start with FILE when comparing directories.
+-//   --strip-trailing-cr  Strip trailing carriage return on input.
+-//   --suppress-common-lines  Do not output common lines.
+-//   --text  -a  Treat all files as text.
+-//   --to-file=FILE2  Compare all operands to FILE2.  FILE2 can be a directory.
+-//   --unidirectional-new-file  Treat absent first files as empty.
+-//   --unified[=NUM]  -u  -U NUM  Output NUM (default 3) lines of unified context.
+-//   --version  -v  Output version info.
+-//   --width=NUM  -W NUM  Output at most NUM (default 130) print columns.
+-// 
+-// FILES are `FILE1 FILE2' or `DIR1 DIR2' or `DIR FILE...' or `FILE... DIR'.
+-// If --from-file or --to-file is given, there are no restrictions on FILES.
+-// If a FILE is `-', read standard input.
+-// 
+-// Report bugs to <bug-gnu-utils@gnu.org>.
+-
+-void getopts (int argc, char const *const argv[])
+-{
+-  while (1) {
+-    int option_index = 0;
+-    static option long_options[] = {
+-      { "brief",                        0, 0, 'q' }, // Output only whether files differ.
+-      { "context",                      2, 0, 'c' }, // Output NUM (default 3) lines of copied context.
+-      { "ed",                           0, 0, 'e' }, // Output an ed script.
+-      { "exclude-from",                 1, 0, ' ' }, // Exclude files that match any pattern in FILE.
+-      { "exclude",                      1, 0, 'x' }, // Exclude files that match PAT.
+-      { "expand-tabs",                  0, 0, 't' }, // Expand tabs to spaces in output.
+-      { "from-file",                    1, 0, ' ' }, // Compare FILE1 to all operands. FILE1 can be a directory.
+-      { "help",                         0, 0, 'h' }, // Output this help.
+-      { "horizon-lines",                1, 0, ' ' }, // Keep NUM lines of the common prefix and suffix.
+-      { "ifdef",                        1, 0, 'D' }, // Output merged file to show `#ifdef NAME' diffs.
+-      { "ignore-all-space",             0, 0, 'w' }, // Ignore all white space.
+-      { "ignore-blank-lines",           0, 0, 'B' }, // Ignore changes whose lines are all blank.
+-      { "ignore-case",                  0, 0, 'i' }, // Ignore case differences in file contents.
+-      { "ignore-file-name-case",        0, 0, ' ' }, // Ignore case when comparing file names.
+-      { "ignore-matching-lines",        1, 0, 'I' }, // Ignore changes whose lines all match RE.
+-      { "ignore-space-change",          0, 0, 'b' }, // Ignore changes in the amount of white space.
+-      { "ignore-tab-expansion",         0, 0, 'E' }, // Ignore changes due to tab expansion.
+-      { "initial-tab",                  0, 0, 'T' }, // Make tabs line up by prepending a tab.
+-      { "label",                        1, 0, ' ' }, // Use LABEL instead of file name.
+-      { "left-column",                  0, 0, ' ' }, // Output only the left column of common lines.
+-      { "line-format",                  1, 0, ' ' }, // Similar, but format all input lines with LFMT.
+-      { "minimal",                      0, 0, 'd' }, // Try hard to find a smaller set of changes.
+-      { "new-file",                     0, 0, 'N' }, // Treat absent files as empty.
+-      { "no-ignore-file-name-case",     0, 0, ' ' }, // Consider case when comparing file names.
+-      { "normal",                       0, 0, ' ' }, // Output a normal diff.
+-      { "paginate",                     0, 0, 'l' }, // Pass the output through `pr' to paginate it.
+-      { "rcs",                          0, 0, 'n' }, // Output an RCS format diff.
+-      { "recursive",                    0, 0, 'r' }, // Recursively compare any subdirectories found.
+-      { "report-identical-files",       0, 0, 's' }, // Report when two files are the same.
+-      { "show-c-function",              0, 0, 'p' }, // Show which C function each change is in.
+-      { "show-function-line",           1, 0, 'F' }, // Show the most recent line matching RE.
+-      { "side-by-side",                 0, 0, 'y' }, // Output in two columns.
+-      { "speed-large-files",            0, 0, ' ' }, // Assume large files and many scattered small changes.
+-      { "starting-file",                1, 0, 'S' }, // Start with FILE when comparing directories.
+-      { "strip-trailing-cr",            0, 0, ' ' }, // Strip trailing carriage return on input.
+-      { "suppress-common-lines",        0, 0, ' ' }, // Do not output common lines.
+-      { "text",                         0, 0, 'a' }, // Treat all files as text.
+-      { "to-file",                      0, 0, ' ' }, // Compare all operands to FILE2.  FILE2 can be a directory.
+-      { "unidirectional-new-file",      0, 0, ' ' }, // Treat absent first files as empty.
+-      { "unified",                      2, 0, 'u' }, // Output NUM (default 3) lines of unified context.
+-      { "version",                      0, 0, 'v' }, // Output version info.
+-      { "width",                        1, 0, 'W' }, // Output at most NUM (default 130) print columns.
+-      { 0,				0, 0,   0 }
+-    };
+-
+-    char const *short_options =
+-      "B"                       // Ignore changes whose lines are all blank.
+-      "C:"                      // Output NUM (default 3) lines of copied context.
+-      "D:"                      // Output merged file to show `#ifdef NAME' diffs.
+-      "E"                       // Ignore changes due to tab expansion.
+-      "F:"                      // Show the most recent line matching RE.
+-      "I:"                      // Ignore changes whose lines all match RE.
+-      "N"                       // Treat absent files as empty.
+-      "S:"                      // Start with FILE when comparing directories.
+-      "T"                       // Make tabs line up by prepending a tab.
+-      "U:"                      // Output NUM (default 3) lines of unified context.
+-      "W:"                      // Output at most NUM (default 130) print columns.
+-      "X:"                      // Exclude files that match any pattern in FILE.
+-      "a"                       // Treat all files as text.
+-      "b"                       // Ignore changes in the amount of white space.
+-      "c"                       // Output NUM (default 3) lines of copied context.
+-      "d"                       // Try hard to find a smaller set of changes.
+-      "e"                       // Output an ed script.
+-      "i"                       // Ignore case differences in file contents.
+-      "l"                       // Pass the output through `pr' to paginate it.
+-      "n"                       // Output an RCS format diff.
+-      "p"                       // Show which C function each change is in.
+-      "q"                       // Output only whether files differ.
+-      "r"                       // Recursively compare any subdirectories found.
+-      "s"                       // Report when two files are the same.
+-      "t"                       // Expand tabs to spaces in output.
+-      "u"                       // Output NUM (default 3) lines of unified context.
+-      "v"                       // Output version info.
+-      "w"                       // Ignore all white space.
+-      "x:"                      // Exclude files that match PAT.
+-      "y"                       // Output in two columns.
+-      ;
+-
+-    int c =
+-      getopt_long
+-        (argc,
+-         const_cast<char *const *> (argv),
+-         short_options,
+-         long_options,
+-         &option_index
+-        );
+-
+-    switch (c) {
+-    case -1:
+-      return;
+-
+-    case 0:
+-      printf ("option %s", long_options[option_index].name);
+-      if (optarg)
+-        printf (" with arg %s", optarg);
+-      printf ("\n");
+-      break;
+-    case 'B':
+-      opt_B_IgnoreBlankLines = true;
+-      break;
+-    case 'C':
+-      {
+-        unsigned linesOfContext = 3;
+-        if (optarg) {
+-          if (sscanf (optarg, "%u", &linesOfContext) != 1) {
+-            fprintf (stderr, "-C <NUM> or --context[=<NUM>] (%d)\n", opt_C_LinesOfCopyContext);
+-            exit (1);
+-          }
+-        }
+-        opt_C_LinesOfCopyContext = linesOfContext;
+-      }
+-      break;
+-    case 'D':
+-      opt_D_IfdefName = optarg;
+-      break;
+-    case 'E':
+-      opt_E_IgnoreTabExpansionChanges = true;
+-      break;
+-    case 'F':
+-      opt_F_ShowMostRecentLineMatching = optarg;
+-      break;
+-    case 'I':
+-      opt_I_IgnoreLinesMatching = optarg;
+-      break;
+-    case 'N':
+-      opt_N_TreatAbsentFilesAsEmpty = true;
+-      break;
+-    case 'S':
+-      opt_S_StartWithFileMatching = optarg;
+-      break;
+-    case 'T':
+-      opt_T_PrependATab = true;
+-      break;
+-    case 'U':
+-      {
+-        unsigned linesOfContext = 3;
+-        if (optarg) {
+-          if (sscanf (optarg, "%u", &linesOfContext) != 1) {
+-            fprintf (stderr, "-U <NUM> or --unified[=<NUM>] (%d)\n", opt_U_LinesOfUnifiedContext);
+-            exit (1);
+-          }
+-        }
+-        opt_U_LinesOfUnifiedContext = linesOfContext;
+-      }
+-      break;
+-    case 'W':
+-      {
+-        unsigned maxPrintColumns = 130;
+-        if (optarg) {
+-          if (sscanf (optarg, "%u", &maxPrintColumns) != 1) {
+-            fprintf (stderr, "-W <NUM> or --width[=<NUM>] (%d)\n", opt_W_MaxPrintColumns);
+-            exit (1);
+-          }
+-        }
+-        opt_W_MaxPrintColumns = maxPrintColumns;
+-      }
+-      break;
+-    case 'X':
+-      opt_X_ExcludeFilesMatching = optarg;
+-      break;
+-    case 'a':
+-      opt_a_TreatAllFilesAsText = true;
+-      break;
+-    case 'b':
+-      opt_b_IgnoreWhitespaceChanges = true;
+-      break;
+-    case 'c':
+-      opt___OutputFormat = opt_c_Context;
+-      break;
+-    case 'd':
+-      opt_d_TryToFindMinimalChanges = true;
+-      break;
+-    case 'e':
+-      opt___OutputFormat = opt_e_EdScript;
+-      break;
+-    case 'i':
+-      opt_i_IgnoreCaseDifferences = true;
+-      break;
+-    case 'l':
+-      opt_l_PaginateWithPr = true;
+-      break;
+-    case 'n':
+-      opt___OutputFormat = opt_n_RCS;
+-      break;
+-    case 'p':
+-      opt_p_ShowChangedCFunction = true;
+-      break;
+-    case 'q':
+-      opt_q_OutputOnlyIfFilesDiffer = true;
+-      break;
+-    case 'r':
+-      opt_r_RecursivelyCompareSubdirectories = true;
+-      break;
+-    case 's':
+-      opt_s_ReportWhenFilesAreSame = true;
+-      break;
+-    case 't':
+-      opt_t_ExpandTabs = true;
+-      break;
+-    case 'u':
+-      opt___OutputFormat = opt_u_Unified;
+-      break;
+-    case 'v':
+-      opt_v_ShowVersionInfo = true;
+-      break;
+-    case 'w':
+-      opt_w_IgnoreAllWhitespace = true;
+-      break;
+-    case 'x':
+-      opt_x_IgnoreFilesMatching = optarg;
+-      break;
+-    case 'y':
+-      opt___OutputFormat = opt_y_SideBySide;
+-      break;
+-    case 'h':
+-    case '?':
+-      fprintf
+-        (stderr,
+-         "Usage: diff [OPTION]... FILES\n"
+-         "Compare files line by line.\n"
+-         "\n"
+-         "  --GTYPE-group-format=GFMT  Similar, but format GTYPE input groups with GFMT.\n"
+-         "  --LTYPE-line-format=LFMT  Similar, but format LTYPE input lines with LFMT.\n"
+-         "    LTYPE is `old', `new', or `unchanged'.  GTYPE is LTYPE or `changed'.\n"
+-         "    GFMT may contain:\n"
+-         "      %<  lines from FILE1\n"
+-         "      %>  lines from FILE2\n"
+-         "      %=  lines common to FILE1 and FILE2\n"
+-         "      %[-][WIDTH][.[PREC]]{doxX}LETTER  printf-style spec for LETTER\n"
+-         "        LETTERs are as follows for new group, lower case for old group:\n"
+-         "          F  first line number\n"
+-         "          L  last line number\n"
+-         "          N  number of lines = L-F+1\n"
+-         "          E  F-1\n"
+-         "          M  L+1\n"
+-         "    LFMT may contain:\n"
+-         "      %L  contents of line\n"
+-         "      %l  contents of line, excluding any trailing newline\n"
+-         "      %[-][WIDTH][.[PREC]]{doxX}n  printf-style spec for input line number\n"
+-         "    Either GFMT or LFMT may contain:\n"
+-         "      %%  %\n"
+-         "      %c'C'  the single character C\n"
+-         "      %c'\\OOO'  the character with octal code OOO\n"
+-         "\n"
+-         "  --brief  -q  Output only whether files differ.\n"
+-         "  --context[=NUM]  -c  -C NUM  Output NUM (default 3) lines of copied context.\n"
+-         "  --ed  -e  Output an ed script.\n"
+-         "  --exclude-from=FILE  -X FILE  Exclude files that match any pattern in FILE.\n"
+-         "  --exclude=PAT  -x PAT  Exclude files that match PAT.\n"
+-         "  --expand-tabs  -t  Expand tabs to spaces in output.\n"
+-         "  --from-file=FILE1  Compare FILE1 to all operands.  FILE1 can be a directory.\n"
+-         "  --help  Output this help.\n"
+-         "  --horizon-lines=NUM  Keep NUM lines of the common prefix and suffix.\n"
+-         "  --ifdef=NAME  -D NAME  Output merged file to show `#ifdef NAME' diffs.\n"
+-         "  --ignore-all-space  -w  Ignore all white space.\n"
+-         "  --ignore-blank-lines  -B  Ignore changes whose lines are all blank.\n"
+-         "  --ignore-case  -i  Ignore case differences in file contents.\n"
+-         "  --ignore-file-name-case  Ignore case when comparing file names.\n"
+-         "  --ignore-matching-lines=RE  -I RE  Ignore changes whose lines all match RE.\n"
+-         "  --ignore-space-change  -b  Ignore changes in the amount of white space.\n"
+-         "  --ignore-tab-expansion  -E  Ignore changes due to tab expansion.\n"
+-         "  --initial-tab  -T  Make tabs line up by prepending a tab.\n"
+-         "  --label LABEL  Use LABEL instead of file name.\n"
+-         "  --left-column  Output only the left column of common lines.\n"
+-         "  --line-format=LFMT  Similar, but format all input lines with LFMT.\n"
+-         "  --minimal  -d  Try hard to find a smaller set of changes.\n"
+-         "  --new-file  -N  Treat absent files as empty.\n"
+-         "  --no-ignore-file-name-case  Consider case when comparing file names.\n"
+-         "  --normal  Output a normal diff.\n"
+-         "  --paginate  -l  Pass the output through `pr' to paginate it.\n"
+-         "  --rcs  -n  Output an RCS format diff.\n"
+-         "  --recursive  -r  Recursively compare any subdirectories found.\n"
+-         "  --report-identical-files  -s  Report when two files are the same.\n"
+-         "  --show-c-function  -p  Show which C function each change is in.\n"
+-         "  --show-function-line=RE  -F RE  Show the most recent line matching RE.\n"
+-         "  --side-by-side  -y  Output in two columns.\n"
+-         "  --speed-large-files  Assume large files and many scattered small changes.\n"
+-         "  --starting-file=FILE  -S FILE  Start with FILE when comparing directories.\n"
+-         "  --strip-trailing-cr  Strip trailing carriage return on input.\n"
+-         "  --suppress-common-lines  Do not output common lines.\n"
+-         "  --text  -a  Treat all files as text.\n"
+-         "  --to-file=FILE2  Compare all operands to FILE2.  FILE2 can be a directory.\n"
+-         "  --unidirectional-new-file  Treat absent first files as empty.\n"
+-         "  --unified[=NUM]  -u  -U NUM  Output NUM (default 3) lines of unified context.\n"
+-         "  --version  -v  Output version info.\n"
+-         "  --width=NUM  -W NUM  Output at most NUM (default 130) print columns.\n"
+-         "\n"
+-         "FILES are `FILE1 FILE2' or `DIR1 DIR2' or `DIR FILE...' or `FILE... DIR'.\n"
+-         "If --from-file or --to-file is given, there are no restrictions on FILES.\n"
+-         "If a FILE is `-', read standard input.\n"
+-         "\n"
+-         "Report bugs to <bug-gnu-utils@gnu.org>.\n"
+-        );
+-      exit (1);
+-    default:
+-      fprintf (stderr, "Unhandled option (%c%s)!\n", c, optarg ? optarg : "");
+-      exit (1);
+-    }
+-  }
+-}
+-
+ // Perform pass #1, in which we find all explicit matches amongst the
+ // unique lines.  For every unique line that appears the same number
+ // of times in both files, we declare the lines to match.
+@@ -1105,37 +681,39 @@
+ 
+ void pass6 ()
+ {
+-  switch (opt___OutputFormat) {
+-  case opt_c_Context:
++
++  switch (diffFormat) {
++  case Context:
+     pass6c ();
+     break;
+ 
+-  case opt_e_EdScript:
++  case EdScript:
+     pass6e ();
+     break;
+ 
+-  case opt_D_IfThenElse:
++  case IfThenElse:
+     pass6i ();
+     break;
+ 
+-  case opt___Normal:
++  case Normal:
+     pass6n ();
+     break;
+ 
+-  case opt_n_RCS:
++  case RCS:
+     pass6r ();
+     break;
+ 
+-  case opt_y_SideBySide:
++  case SideBySide:
+     pass6y ();
+     break;
+ 
+-  case opt_u_Unified:
++  case Unified:
+     pass6u ();
+     break;
+ 
++  case Default:
+   default:
+-    pass6n ();
++    pass6c ();
+     break;
+   }
+ }
+@@ -1186,10 +764,10 @@
+     }
+ 
+     // We're now looking at at least 1 delete or insert, so a window
+-    // begins here (or, rather, opt_C_LinesOfCopyContext lines earlier).
++    // begins here (or, rather, optCopyContext lines earlier).
+     
+-    int boOldWindow = max (0, int (o) - int (opt_C_LinesOfCopyContext));
+-    int boNewWindow = max (0, int (n) - int (opt_C_LinesOfCopyContext));
++    int boOldWindow = max (0, int (o) - int (optCopyContext));
++    int boNewWindow = max (0, int (n) - int (optCopyContext));
+ 
+     if (1 < optVerbose) {
+       fprintf (stderr, "boOldWindow = %d, boNewWindow = %d\n", boOldWindow, boNewWindow);
+@@ -1214,11 +792,11 @@
+         n += 1;
+       }
+ 
+-      // This context will end opt_C_LinesOfCopyContext matched lines past the
++      // This context will end optCopyContext matched lines past the
+       // last set of deletes or inserts we find.
+ 
+       widenWindow = false;
+-      for (unsigned l = 0; !widenWindow && l < opt_C_LinesOfCopyContext; l += 1) {
++      for (unsigned l = 0; !widenWindow && l < optCopyContext; l += 1) {
+         if (o < lines[0].size ()) {
+           widenWindow |= lines[0][o].l == ~0;
+           o += 1;
+@@ -1233,10 +811,10 @@
+       eoNewWindow = n;
+ 
+       // However, since another window could follow, we look
+-      // opt_C_LinesOfCopyContext ahead for another delete or insert.
++      // optCopyContext ahead for another delete or insert.
+ 
+       if (!widenWindow) {
+-        for (unsigned l = 0; l < (2 * opt_C_LinesOfCopyContext + 1); l += 1) {
++        for (unsigned l = 0; l < (2 * optCopyContext + 1); l += 1) {
+           if (o < lines[0].size ()) {
+             widenWindow |= lines[0][o].l == ~0;
+             o += 1;
+@@ -1590,7 +1168,7 @@
+ 
+   // Starting at the top of both files,...
+ 
+-  int columnWidth = (opt_W_MaxPrintColumns - 7) / 2;
++  int columnWidth = (optPageWidth - 7) / 2;
+ 
+   unsigned o = 0;
+   unsigned n = 0;

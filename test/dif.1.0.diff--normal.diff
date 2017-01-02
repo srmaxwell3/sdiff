@@ -1,0 +1,47 @@
+1,2d0
+< #include <string>
+< using std::string;
+5,6c3,4
+< #include <vector>
+< using std::vector;
+---
+> #include <string>
+> using std::string;
+12,13d9
+<   vector<vector<int *> *> fileLines;
+< 
+17,18d12
+<       vector<int *> *lines = new vector<int *> ();
+< 
+19a14
+>       unsigned n = 0;
+21,23c16,18
+<         int *line = &table[buffer];
+<         lines->push_back (line);
+<         *line += 1;
+---
+> 	string l (buffer);
+> 	table[l] += 1;
+> 	n += 1;
+25,26c20
+<       fprintf (stderr, " %u lines.\n", lines->size ());
+<       fileLines.push_back (lines);
+---
+>       fprintf (stderr, " %u lines.\n", n);
+28d21
+<       fprintf (stderr, "%s: Unable to open %s!  Ignoring....\n", argv[a]);
+31c24
+<   printf ("# table.size () = %d\n", table.size ());
+---
+>   printf ("table.size () = %d\n", table.size ());
+37,44c30
+<     fprintf (stderr, "# counts[%d] = %d\n", i->first, i->second);
+<   }
+<   for (int f = 0; f < fileLines.size (); f += 1) {
+<     fprintf (stderr, "# file #%d\n", f);
+<     vector<int *> *lines = fileLines[f];
+<     for (int l = 0; l < lines->size (); l += 1) {
+<       fprintf (stderr, "#   [%d] = %d\n", l, *(*lines)[l]);
+<     }
+---
+>     fprintf (stderr, "counts[%d] = %d\n", i->first, i->second);

@@ -1,0 +1,16 @@
+sdiff: sdiff.cpp:1858: void pass6y(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+#include <algorithm>                                          <
+using std::find;                                              <
+#include <string>                                               #include <string>
+using std::string;                                              using std::string;
+#include <list>                                                 #include <list>
+using std::list;                                                using std::list;
+#include <map>                                                  #include <map>
+using std::map;                                                 using std::map;
+#include <vector>                                               #include <vector>
+using std::vector;                                              using std::vector;
+#include <stdio.h>                                              #include <stdio.h>
+                                                              > 
+                                                              > struct Line : public string {
+                                                              >   Line (string _text) :
+                                                              >     text (_text)

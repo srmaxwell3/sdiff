@@ -1,0 +1,141 @@
+sdiff: sdiff.cpp:1745: void pass6u(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+--- dif.8.cpp	0000-00-00 00:00:00.000000000 +0000
++++ dif.7.cpp	0000-00-00 00:00:00.000000000 +0000
+@@ -1,1674 +1,1252 @@
+ #include <algorithm>
+ using std::find;
+ #include <string>
+ using std::string;
+ #include <list>
+ using std::list;
+ #include <map>
+ using std::map;
+ #include <vector>
+ using std::vector;
+ #include <stdio.h>
+-#include <getopt.h>
+ 
+ enum DiffFormat {
+-  opt_D_IfThenElse,
+-  opt___Normal,
+-  opt_c_Context,
+-  opt_e_EdScript,
+-  opt_n_RCS,
+-  opt_u_Unified,
+-  opt_y_SideBySide
+-};
+-
+-DiffFormat opt___OutputFormat = opt___Normal;
++  Default,
+ 
+-bool       opt_B_IgnoreBlankLines = false;
+-unsigned   opt_C_LinesOfCopyContext = 3;
+-string     opt_D_IfdefName;
+-bool       opt_E_IgnoreTabExpansionChanges = false;
+-string     opt_F_ShowMostRecentLineMatching;
+-string     opt_I_IgnoreLinesMatching;
+-bool       opt_N_TreatAbsentFilesAsEmpty = false;
+-string     opt_S_StartWithFileMatching;
+-bool       opt_T_PrependATab = false;
+-unsigned   opt_U_LinesOfUnifiedContext = 3;
+-unsigned   opt_W_MaxPrintColumns = 130;
+-string     opt_X_ExcludeFilesMatching;
+-bool       opt_a_TreatAllFilesAsText = false;
+-bool       opt_b_IgnoreWhitespaceChanges = false;
+-bool       opt_d_TryToFindMinimalChanges = false;
+-bool       opt_i_IgnoreCaseDifferences = false;
+-bool       opt_l_PaginateWithPr = false;
+-bool       opt_p_ShowChangedCFunction = false;
+-bool       opt_q_OutputOnlyIfFilesDiffer = false;
+-bool       opt_r_RecursivelyCompareSubdirectories = false;
+-bool       opt_s_ReportWhenFilesAreSame = false;
+-bool       opt_t_ExpandTabs = false;
+-bool       opt_v_ShowVersionInfo = false;
+-bool       opt_w_IgnoreAllWhitespace = false;
+-string     opt_x_IgnoreFilesMatching;
++  Context,
++  EdScript,
++  IfThenElse,
++  Normal,
++  RCS,
++  SideBySide,
++  Unified
++};
++
++DiffFormat diffFormat = SideBySide;
+ 
++unsigned optCopyContext = 3;
++unsigned optPageWidth = 130;
+ unsigned optVerbose = 2;
+ 
+ struct Line : public string {
+   Line (string _text) :
+     string (_text)
+   {
+   }
+   ~Line () {
+     copies[0].erase (copies[0].begin (), copies[0].end ());
+     copies[1].erase (copies[1].begin (), copies[1].end ());
+   }
+   void Dump (FILE *out) {
+     fprintf (out, "{{ ");
+     for (list<unsigned>::iterator i = copies[0].begin (); i != copies[0].end (); i++) {
+       fprintf (out, "%u ", *i);
+     }
+     fprintf (out, "},{ ");
+     for (list<unsigned>::iterator i = copies[1].begin (); i != copies[1].end (); i++) {
+       fprintf (out, "%u ", *i);
+     }
+     fprintf (out, "}}\t%s\n", c_str ());
+   }
+   list<unsigned> copies[2];
+ };
+ 
+ struct LinePtr {
+   LinePtr (Line *_line) :
+     line (_line),
+     l (~0u)
+   {
+   }
+   void Dump (FILE *out) {
+     fprintf (out, "[%d] ", l);
+     line->Dump (out);
+   }
+   Line *line;
+   unsigned l;
+ };
+ 
+ typedef map<string, Line *> MapStringToLinePtr;
+ typedef vector<LinePtr> VectorLinePtr;
+ 
+ // Our name.
+ 
+ char *ARGV0 = "dif3";
+ 
+ // The 'symbol' (line) table.
+ 
+ MapStringToLinePtr table;
+ 
+ // The names of the 2 files to be diff'd.
+ 
+ char const *files[2] = { 0, 0 };
+ 
+ // The lines of the 2 files to be diff'd.
+ 
+ VectorLinePtr lines[2];
+ 
+ // Miscellaneous metrics.
+ 
+ unsigned nTotalMatchedBlocks = 0;
+ unsigned nMatchedBlocks = 0;
+ unsigned nTotalMatchedLines = 0;
+ unsigned nMatchedLines = 0;
++
++void pass1 ();
++void pass2 ();
++void pass3 ();
++void pass4 ();
++void pass5 ();
++void pass6 ();
++
++int main (int argc, char *argv[])

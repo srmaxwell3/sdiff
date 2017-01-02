@@ -1,0 +1,68 @@
+#include <string>						#include <string>
+using std::string;						using std::string;
+							      >	#include <list>
+							      >	using std::list;
+#include <map>							#include <map>
+using std::map;							using std::map;
+#include <vector>						#include <vector>
+using std::vector;						using std::vector;
+#include <stdio.h>						#include <stdio.h>
+
+							      >	struct Line : public string {
+							      >	  Line (string _text) :
+							      >	    text (_text)
+							      >	  {
+							      >	  }
+							      >	  string text;
+							      >	  list<unsigned> counts[2];
+							      >	};
+							      >
+							      >	typedef map<string, Line *> MapStringToLinePtr;
+							      >	typedef vector<Line *> VectorLinePtr;
+							      >
+int main (int argc, char *argv[])				int main (int argc, char *argv[])
+{								{
+  map<string, int> table;				      |	  MapStringToLinePtr table;
+  vector<vector<int *> *> fileLines;			      |	  VectorLinePtr lines[2];
+
+  for (int a = 1; a < argc; a += 1) {			      |	  for (int a = 1; a < argc && a <= 2; a += 1) {
+    if (FILE *f = fopen (argv[a], "r")) {			    if (FILE *f = fopen (argv[a], "r")) {
+      fprintf (stderr, "# Reading %s...", argv[a]);		      fprintf (stderr, "# Reading %s...", argv[a]);
+      vector<int *> *lines = new vector<int *> ();	      <
+
+							      >	      VectorLinePtr *lines = new VectorLinePtr ();
+      char buffer[1024];					      char buffer[1024];
+      while (fgets (buffer, sizeof (buffer), f)) {		      while (fgets (buffer, sizeof (buffer), f)) {
+        int *line = &table[buffer];			      |	        string text (buffer);
+        lines->push_back (line);			      |
+        *line += 1;					      |	        Line *line = table[text];
+							      >
+							      >	        if (!line) {
+							      >	          table[text] = line = new Line (text);
+							      >	        }
+							      >	        line->counts[a - 1].push_back (lines[a - 1].size ());
+							      >	        lines[a - 1].push_back (line);
+      }								      }
+      fprintf (stderr, " %u lines.\n", lines->size ());	      |	      fprintf (stderr, " %u lines.\n", lines[a - 1]->size ())
+      fileLines.push_back (lines);			      <
+    } else {							    } else {
+      fprintf (stderr, "%s: Unable to open %s!  Ignoring....\	      fprintf (stderr, "%s: Unable to open %s!  Ignoring....\
+    }								    }
+  }								  }
+  printf ("# table.size () = %d\n", table.size ());		  printf ("# table.size () = %d\n", table.size ());
+  map<int, int> counts;						  map<int, int> counts;
+  for (map<string, int>::iterator i = table.begin (); i != ta	  for (map<string, int>::iterator i = table.begin (); i != ta
+    counts[i->second] += 1;				      |	    Line *l = i->second;
+							      >	    counts[l->counts[0].size () + l->counts[1].size ()] += 1;
+  }								  }
+  for (map<int, int>::iterator i = counts.begin (); i != coun	  for (map<int, int>::iterator i = counts.begin (); i != coun
+    fprintf (stderr, "# counts[%d] = %d\n", i->first, i->seco	    fprintf (stderr, "# counts[%d] = %d\n", i->first, i->seco
+  }								  }
+  for (int f = 0; f < fileLines.size (); f += 1) {	      |	  for (int f = 0; f < 2; f += 1) {
+    fprintf (stderr, "# file #%d\n", f);		      |	    fprintf (stderr, "# file #%d\n", f + 1);
+    vector<int *> *lines = fileLines[f];		      |	    for (int l = 0; l < lines[f].size (); l += 1) {
+    for (int l = 0; l < lines->size (); l += 1) {	      |	      fprintf (stderr, "#   [%d] = %d\n", l, lines[f][l]->cou
+      fprintf (stderr, "#   [%d] = %d\n", l, *(*lines)[l]);   <
+    }								    }
+  }								  }
+}								}

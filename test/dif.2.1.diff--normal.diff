@@ -1,0 +1,65 @@
+3,4d2
+< #include <list>
+< using std::list;
+11,22d8
+< struct Line : public string {
+<   Line (string _text) :
+<     text (_text)
+<   {
+<   }
+<   string text;
+<   list<unsigned> counts[2];
+< };
+< 
+< typedef map<string, Line *> MapStringToLinePtr;
+< typedef vector<Line *> VectorLinePtr;
+< 
+25,26c11,12
+<   MapStringToLinePtr table;
+<   VectorLinePtr lines[2];
+---
+>   map<string, int> table;
+>   vector<vector<int *> *> fileLines;
+28c14
+<   for (int a = 1; a < argc && a <= 2; a += 1) {
+---
+>   for (int a = 1; a < argc; a += 1) {
+30a17
+>       vector<int *> *lines = new vector<int *> ();
+32d18
+<       VectorLinePtr *lines = new VectorLinePtr ();
+35,43c21,23
+<         string text (buffer);
+< 
+<         Line *line = table[text];
+< 
+<         if (!line) {
+<           table[text] = line = new Line (text);
+<         }
+<         line->counts[a - 1].push_back (lines[a - 1].size ());
+<         lines[a - 1].push_back (line);
+---
+>         int *line = &table[buffer];
+>         lines->push_back (line);
+>         *line += 1;
+45c25,26
+<       fprintf (stderr, " %u lines.\n", lines[a - 1]->size ());
+---
+>       fprintf (stderr, " %u lines.\n", lines->size ());
+>       fileLines.push_back (lines);
+53,54c34
+<     Line *l = i->second;
+<     counts[l->counts[0].size () + l->counts[1].size ()] += 1;
+---
+>     counts[i->second] += 1;
+59,62c39,43
+<   for (int f = 0; f < 2; f += 1) {
+<     fprintf (stderr, "# file #%d\n", f + 1);
+<     for (int l = 0; l < lines[f].size (); l += 1) {
+<       fprintf (stderr, "#   [%d] = %d\n", l, lines[f][l]->counts[f].size ());
+---
+>   for (int f = 0; f < fileLines.size (); f += 1) {
+>     fprintf (stderr, "# file #%d\n", f);
+>     vector<int *> *lines = fileLines[f];
+>     for (int l = 0; l < lines->size (); l += 1) {
+>       fprintf (stderr, "#   [%d] = %d\n", l, *(*lines)[l]);

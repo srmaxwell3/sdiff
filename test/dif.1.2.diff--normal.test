@@ -1,0 +1,71 @@
+2a3,4
+> #include <list>
+> using std::list;
+9,12c11,18
+< int main (int argc, char *argv[])
+< {
+<   map<string, int> table;
+<   vector<vector<int *> *> fileLines;
+---
+> struct Line : public string {
+>   Line (string _text) :
+>     text (_text)
+>   {
+>   }
+>   string text;
+>   list<unsigned> counts[2];
+> };
+14,17c20,21
+<   for (int a = 1; a < argc; a += 1) {
+<     if (FILE *f = fopen (argv[a], "r")) {
+<       fprintf (stderr, "# Reading %s...", argv[a]);
+<       vector<int *> *lines = new vector<int *> ();
+---
+> typedef map<string, Line *> MapStringToLinePtr;
+> typedef vector<Line *> VectorLinePtr;
+18a23,32
+> int main (int argc, char *argv[])
+> {
+>   MapStringToLinePtr table;
+>   VectorLinePtr lines[2];
+> 
+>   for (int a = 1; a < argc && a <= 2; a += 1) {
+>     if (FILE *f = fopen (argv[a], "r")) {
+>       fprintf (stderr, "# Reading %s...", argv[a]);
+> 
+>       VectorLinePtr *lines = new VectorLinePtr ();
+21,23c35,43
+<         int *line = &table[buffer];
+<         lines->push_back (line);
+<         *line += 1;
+---
+>         string text (buffer);
+> 
+>         Line *line = table[text];
+> 
+>         if (!line) {
+>           table[text] = line = new Line (text);
+>         }
+>         line->counts[a - 1].push_back (lines[a - 1].size ());
+>         lines[a - 1].push_back (line);
+25,26c45
+<       fprintf (stderr, " %u lines.\n", lines->size ());
+<       fileLines.push_back (lines);
+---
+>       fprintf (stderr, " %u lines.\n", lines[a - 1]->size ());
+34c53,54
+<     counts[i->second] += 1;
+---
+>     Line *l = i->second;
+>     counts[l->counts[0].size () + l->counts[1].size ()] += 1;
+39,43c59,62
+<   for (int f = 0; f < fileLines.size (); f += 1) {
+<     fprintf (stderr, "# file #%d\n", f);
+<     vector<int *> *lines = fileLines[f];
+<     for (int l = 0; l < lines->size (); l += 1) {
+<       fprintf (stderr, "#   [%d] = %d\n", l, *(*lines)[l]);
+---
+>   for (int f = 0; f < 2; f += 1) {
+>     fprintf (stderr, "# file #%d\n", f + 1);
+>     for (int l = 0; l < lines[f].size (); l += 1) {
+>       fprintf (stderr, "#   [%d] = %d\n", l, lines[f][l]->counts[f].size ());

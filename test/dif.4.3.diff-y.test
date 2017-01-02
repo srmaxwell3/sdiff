@@ -1,0 +1,747 @@
+#include <algorithm>                                            #include <algorithm>
+using std::find;                                                using std::find;
+#include <string>                                               #include <string>
+using std::string;                                              using std::string;
+#include <list>                                                 #include <list>
+using std::list;                                                using std::list;
+#include <map>                                                  #include <map>
+using std::map;                                                 using std::map;
+#include <vector>                                               #include <vector>
+using std::vector;                                              using std::vector;
+#include <stdio.h>                                              #include <stdio.h>
+                                                                
+enum DiffFormat {                                               enum DiffFormat {
+  Default,                                                        Default,
+                                                                
+  Context,                                                        Context,
+  EdScript,                                                       EdScript,
+  IfThenElse,                                                     IfThenElse,
+  Normal,                                                         Normal,
+  RCS,                                                            RCS,
+  SideBySide,                                                     SideBySide,
+  Unified                                                         Unified
+};                                                              };
+                                                                
+DiffFormat diffFormat = Unified;                                DiffFormat diffFormat = Unified;
+                                                                
+int optVerbose = 1;                                             int optVerbose = 1;
+                                                                
+struct Line : public string {                                   struct Line : public string {
+  Line (string _text) :                                           Line (string _text) :
+    string (_text)                                                  string (_text)
+  {                                                               {
+  }                                                               }
+  ~Line () {                                                      ~Line () {
+    copies[0].erase (copies[0].begin (), copies[0].end ());         copies[0].erase (copies[0].begin (), copies[0].end ());
+    copies[1].erase (copies[1].begin (), copies[1].end ());         copies[1].erase (copies[1].begin (), copies[1].end ());
+  }                                                               }
+  void Dump (FILE *out) {                                         void Dump (FILE *out) {
+    fprintf (out, "{{ ");                                           fprintf (out, "{{ ");
+    for (list<unsigned>::iterator i = copies[0].begin (); i !       for (list<unsigned>::iterator i = copies[0].begin (); i !
+      fprintf (out, "%u ", *i);                                       fprintf (out, "%u ", *i);
+    }                                                               }
+    fprintf (out, "},{ ");                                          fprintf (out, "},{ ");
+    for (list<unsigned>::iterator i = copies[1].begin (); i !       for (list<unsigned>::iterator i = copies[1].begin (); i !
+      fprintf (out, "%u ", *i);                                       fprintf (out, "%u ", *i);
+    }                                                               }
+    fprintf (out, "}}\t%s", c_str ());                              fprintf (out, "}}\t%s", c_str ());
+  }                                                               }
+  list<unsigned> copies[2];                                       list<unsigned> copies[2];
+};                                                              };
+                                                                
+struct LinePtr {                                                struct LinePtr {
+  LinePtr (Line *_line) :                                         LinePtr (Line *_line) :
+    line (_line),                                                   line (_line),
+    l (~0u)                                                         l (~0u)
+  {                                                               {
+  }                                                               }
+  void Dump (FILE *out) {                                         void Dump (FILE *out) {
+    fprintf (out, "[%d] ", l);                                      fprintf (out, "[%d] ", l);
+    line->Dump (out);                                               line->Dump (out);
+  }                                                               }
+  Line *line;                                                     Line *line;
+  unsigned l;                                                     unsigned l;
+};                                                              };
+                                                                
+typedef map<string, Line *> MapStringToLinePtr;                 typedef map<string, Line *> MapStringToLinePtr;
+typedef vector<LinePtr> VectorLinePtr;                          typedef vector<LinePtr> VectorLinePtr;
+                                                                
+char *ARGV0 = "dif2";                                           char *ARGV0 = "dif2";
+                                                                
+int main (int argc, char *argv[])                               int main (int argc, char *argv[])
+{                                                               {
+  char const *files[2] = { 0, 0 };                                char const *files[2] = { 0, 0 };
+                                                                
+  MapStringToLinePtr table;                                       MapStringToLinePtr table;
+  VectorLinePtr lines[2];                                         VectorLinePtr lines[2];
+                                                                
+  unsigned nTotalMatchedBlocks = 0;                               unsigned nTotalMatchedBlocks = 0;
+  unsigned nMatchedBlocks = 0;                                    unsigned nMatchedBlocks = 0;
+  unsigned nTotalMatchedLines = 0;                                unsigned nTotalMatchedLines = 0;
+  unsigned nMatchedLines = 0;                                     unsigned nMatchedLines = 0;
+                                                                
+  // Read the old [0] file, and the new [1] file.                 // Read the old [0] file, and the new [1] file.
+                                                                
+  for (int a = 1, n = 0; a < argc && n < 2; a += 1, n += 1) {     for (int a = 1, n = 0; a < argc && n < 2; a += 1, n += 1) {
+    files[n] = argv[a];                                             files[n] = argv[a];
+                                                                
+    if (FILE *f = fopen (files[n], "r")) {                          if (FILE *f = fopen (files[n], "r")) {
+      if (0 < optVerbose) {                                           if (0 < optVerbose) {
+        fprintf (stderr, "# Reading %s...", files[n]);                  fprintf (stderr, "# Reading %s...", files[n]);
+      }                                                               }
+                                                                
+      char buffer[1024];                                              char buffer[1024];
+      unsigned nUniq = 0;                                             unsigned nUniq = 0;
+                                                                
+      while (fgets (buffer, sizeof (buffer), f)) {                    while (fgets (buffer, sizeof (buffer), f)) {
+        string text (buffer);                                           string text (buffer);
+                                                                
+        Line *line = table[text];                                       Line *line = table[text];
+                                                                
+        if (!line) {                                                    if (!line) {
+          table[text] = line = new Line (text);                           table[text] = line = new Line (text);
+          nUniq += 1;                                                     nUniq += 1;
+        }                                                               }
+        line->copies[n].push_back (lines[n].size ());                   line->copies[n].push_back (lines[n].size ());
+        lines[n].push_back (line);                                      lines[n].push_back (line);
+      }                                                               }
+                                                                
+      if (0 < optVerbose) {                                           if (0 < optVerbose) {
+        fprintf (stderr, " %u lines, %u unique.\n", lines[n].           fprintf (stderr, " %u lines, %u unique.\n", lines[n].
+      }                                                               }
+    } else {                                                        } else {
+      fprintf (stderr, "%s: Unable to open %s!  Exiting....\n         fprintf (stderr, "%s: Unable to open %s!  Exiting....\n
+      perror (ARGV0);                                                 perror (ARGV0);
+      exit (1);                                                       exit (1);
+    }                                                               }
+  }                                                               }
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    printf ("# Total unique lines = %d\n", table.size ());          printf ("# Total unique lines = %d\n", table.size ());
+  }                                                               }
+                                                                
+  // map<int, int> counts;                                        // map<int, int> counts;
+  // for (MapStringToLinePtr::iterator i = table.begin (); i      // for (MapStringToLinePtr::iterator i = table.begin (); i 
+  //   Line *l = i->second;                                       //   Line *l = i->second;
+  //   counts[l->counts[0].size () + l->counts[1].size ()] +=     //   counts[l->counts[0].size () + l->counts[1].size ()] +=
+  // }                                                            // }
+  // for (map<int, int>::iterator i = counts.begin (); i != c     // for (map<int, int>::iterator i = counts.begin (); i != c
+  //   fprintf (stderr, "# counts[%d] = %d\n", i->first, i->s     //   fprintf (stderr, "# counts[%d] = %d\n", i->first, i->s
+  // }                                                            // }
+                                                                
+  // Perform pass #1, in which we find all explicit matches a     // Perform pass #1, in which we find all explicit matches a
+  // the unique lines.  For every unique line that appears th     // the unique lines.  For every unique line that appears th
+  // number of times in both files, we declare the lines to m     // number of times in both files, we declare the lines to m
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, "# Pass 1 (finding matches amongst uniqu       fprintf (stderr, "# Pass 1 (finding matches amongst uniqu
+  }                                                               }
+                                                                
+  nMatchedLines = 0;                                              nMatchedLines = 0;
+                                                                
+  for (MapStringToLinePtr::iterator i = table.begin (); i !=      for (MapStringToLinePtr::iterator i = table.begin (); i != 
+    Line *l = i->second;                                            Line *l = i->second;
+                                                                
+    // If the number of old and new lines match, then we decl       // If the number of old and new lines match, then we decl
+    // they are (all) the same line.  Note, it isn't possible       // they are (all) the same line.  Note, it isn't possible
+    // numbers of both files to be 0.                               // numbers of both files to be 0.
+                                                                
+    // (In the original algorithm, we only recognized a match       // (In the original algorithm, we only recognized a match
+    // if there was exactly 1 copy for each file.)                  // if there was exactly 1 copy for each file.)
+                                                                
+    if (l->copies[0].size () == l->copies[1].size ()) {             if (l->copies[0].size () == l->copies[1].size ()) {
+      nMatchedLines += 1;                                             nMatchedLines += 1;
+                                                                
+      // For each matched line in the new file, mark it with          // For each matched line in the new file, mark it with 
+      // corresponding line (number) in the old file.                 // corresponding line (number) in the old file.
+                                                                
+      while (!l->copies[0].empty ()) {                                while (!l->copies[0].empty ()) {
+        unsigned o = l->copies[0].front ();                             unsigned o = l->copies[0].front ();
+        unsigned n = l->copies[1].front ();                             unsigned n = l->copies[1].front ();
+                                                                
+        // Match up the pair.                                           // Match up the pair.
+                                                                
+        lines[0][o].l = n;                                              lines[0][o].l = n;
+        lines[1][n].l = o;                                              lines[1][n].l = o;
+                                                                
+        // Remove the matched line numbers from the lists.              // Remove the matched line numbers from the lists.
+                                                                
+        l->copies[0].pop_front ();                                      l->copies[0].pop_front ();
+        l->copies[1].pop_front ();                                      l->copies[1].pop_front ();
+      }                                                               }
+    }                                                               }
+  }                                                               }
+  nTotalMatchedLines += nMatchedLines;                            nTotalMatchedLines += nMatchedLines;
+                                                                
+  // Let's see the intermediate results.                          // Let's see the intermediate results.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, " found %u matched lines (%u total).\n",       fprintf (stderr, " found %u matched lines (%u total).\n",
+                                                                
+    if (1 < optVerbose) {                                           if (1 < optVerbose) {
+      for (int f = 0; f < 2; f += 1) {                                for (int f = 0; f < 2; f += 1) {
+        fprintf (stderr, "# file #%d\n", f + 1);                        fprintf (stderr, "# file #%d\n", f + 1);
+        for (int l = 0; l < lines[f].size (); l += 1) {                 for (int l = 0; l < lines[f].size (); l += 1) {
+          fprintf (stderr, "#   [%d] ", l);                               fprintf (stderr, "#   [%d] ", l);
+          lines[f][l].Dump (stderr);                                      lines[f][l].Dump (stderr);
+        }                                                               }
+      }                                                               }
+    }                                                               }
+  }                                                               }
+                                                                
+  // Perform Pass #2, in which we attempt to 'widen' blocks o     // Perform Pass #2, in which we attempt to 'widen' blocks o
+  // lines, by appending lines which are the same in both fil     // lines, by appending lines which are the same in both fil
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, "# Pass #2 (spreading matches down)...")       fprintf (stderr, "# Pass #2 (spreading matches down)...")
+  }                                                               }
+                                                                
+  nMatchedBlocks = 0;                                             nMatchedBlocks = 0;
+  nMatchedLines = 0;                                              nMatchedLines = 0;
+                                                                
+  // Starting at the top of the old file,...                      // Starting at the top of the old file,...
+                                                                
+  for (unsigned o = 0; o < lines[0].size (); o += 1) {            for (unsigned o = 0; o < lines[0].size (); o += 1) {
+                                                                
+    // ... skip any currently unmatched lines...                    // ... skip any currently unmatched lines...
+                                                                
+    if (lines[0][o].l == ~0) {                                      if (lines[0][o].l == ~0) {
+      continue;                                                       continue;
+    }                                                               }
+                                                                
+    // ... until we find an [already] matched line.  Then, sk       // ... until we find an [already] matched line.  Then, sk
+    // the set of 1 or more matched lines, until we reach any       // the set of 1 or more matched lines, until we reach any
+    // following, still-unmatched line.                             // following, still-unmatched line.
+                                                                
+    unsigned n;                                                     unsigned n;
+    do {                                                            do {
+      n = lines[0][o].l + 1;                                          n = lines[0][o].l + 1;
+      o += 1;                                                         o += 1;
+    } while (o < lines[0].size () && lines[0][o].l != ~0);          } while (o < lines[0].size () && lines[0][o].l != ~0);
+                                                                
+    // Now, o - 1 is the line number of the last matched old        // Now, o - 1 is the line number of the last matched old 
+    // n - 1 is the line number of the last matched new line.       // n - 1 is the line number of the last matched new line.
+    // to add new old and new lines, if they match.                 // to add new old and new lines, if they match.
+                                                                
+    // Finally, attempt to add unmatched lines to the preceed       // Finally, attempt to add unmatched lines to the preceed
+    // matched set.                                                 // matched set.
+                                                                
+    for (; o < lines[0].size () && lines[0][o].l == ~0; o +=        for (; o < lines[0].size () && lines[0][o].l == ~0; o += 
+                                                                
+      // If the [next] pair of old and new lines aren't the s         // If the [next] pair of old and new lines aren't the s
+                                                                
+      if (lines[0][o].line != lines[1][n].line) {                     if (lines[0][o].line != lines[1][n].line) {
+        break;                                                          break;
+      }                                                               }
+                                                                
+      // Match up the pair.                                           // Match up the pair.
+                                                                
+      lines[0][o].l = n;                                              lines[0][o].l = n;
+      lines[1][n].l = o;                                              lines[1][n].l = o;
+                                                                
+      // Remove the matched line numbers form the lists.              // Remove the matched line numbers form the lists.
+                                                                
+      Line *line = lines[0][o].line;                                  Line *line = lines[0][o].line;
+      list<unsigned> &oldCopies = line->copies[0];                    list<unsigned> &oldCopies = line->copies[0];
+      list<unsigned>::iterator oL = find (oldCopies.begin (),         list<unsigned>::iterator oL = find (oldCopies.begin (),
+      if (oL != oldCopies.end ()) {                                   if (oL != oldCopies.end ()) {
+        oldCopies.erase (oL);                                           oldCopies.erase (oL);
+      }                                                               }
+      list<unsigned> &newCopies = line->copies[0];                    list<unsigned> &newCopies = line->copies[0];
+      list<unsigned>::iterator nL = find (newCopies.begin (),         list<unsigned>::iterator nL = find (newCopies.begin (),
+      if (nL != newCopies.end ()) {                                   if (nL != newCopies.end ()) {
+        newCopies.erase (nL);                                           newCopies.erase (nL);
+      }                                                               }
+                                                                
+      nMatchedLines += 1;                                             nMatchedLines += 1;
+    }                                                               }
+    nMatchedBlocks += 1;                                            nMatchedBlocks += 1;
+  }                                                               }
+  nTotalMatchedLines += nMatchedLines;                            nTotalMatchedLines += nMatchedLines;
+  nTotalMatchedBlocks += nMatchedBlocks;                          nTotalMatchedBlocks += nMatchedBlocks;
+                                                                
+  // Let's see the intermediate results.                          // Let's see the intermediate results.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr,                                                fprintf (stderr,
+             " found %u/%u matched lines/blocks (%u/%u totals                " found %u/%u matched lines/blocks (%u/%u totals
+             nMatchedLines,                                                  nMatchedLines,
+             nMatchedBlocks,                                                 nMatchedBlocks,
+             nTotalMatchedLines,                                             nTotalMatchedLines,
+             nTotalMatchedBlocks                                             nTotalMatchedBlocks
+            );                                                              );
+    if (1 < optVerbose) {                                           if (1 < optVerbose) {
+      for (int f = 0; f < 2; f += 1) {                                for (int f = 0; f < 2; f += 1) {
+        fprintf (stderr, "# file #%d\n", f + 1);                        fprintf (stderr, "# file #%d\n", f + 1);
+        for (int l = 0; l < lines[f].size (); l += 1) {                 for (int l = 0; l < lines[f].size (); l += 1) {
+          fprintf (stderr, "#   [%d] ", l);                               fprintf (stderr, "#   [%d] ", l);
+          lines[f][l].Dump (stderr);                                      lines[f][l].Dump (stderr);
+        }                                                               }
+      }                                                               }
+    }                                                               }
+  }                                                               }
+                                                                
+  // Perform Pass #3, in which we attempt to 'widen' blocks o     // Perform Pass #3, in which we attempt to 'widen' blocks o
+  // lines, by prepending lines which are the same in both fi     // lines, by prepending lines which are the same in both fi
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, "# Pass #3 (spreading matches up)...");        fprintf (stderr, "# Pass #3 (spreading matches up)...");
+  }                                                               }
+                                                                
+  nMatchedBlocks = 0;                                             nMatchedBlocks = 0;
+  nMatchedLines = 0;                                              nMatchedLines = 0;
+                                                                
+  // Starting at the bottom of the old file,...                   // Starting at the bottom of the old file,...
+                                                                
+  for (int o = lines[0].size (); 0 <= o; o -= 1) {                for (int o = lines[0].size (); 0 <= o; o -= 1) {
+                                                                
+    // ... skip any currently unmatched lines...                    // ... skip any currently unmatched lines...
+                                                                
+    if (lines[0][o].l == ~0) {                                      if (lines[0][o].l == ~0) {
+      continue;                                                       continue;
+    }                                                               }
+                                                                
+    // ... until we find an [already] matched line.  Then, sk       // ... until we find an [already] matched line.  Then, sk
+    // the set of 1 or more matched lines, until we reach any       // the set of 1 or more matched lines, until we reach any
+    // following, still-unmatched line.                             // following, still-unmatched line.
+                                                                
+    unsigned n;                                                     unsigned n;
+    do {                                                            do {
+      n = lines[0][o].l - 1;                                          n = lines[0][o].l - 1;
+      o -= 1;                                                         o -= 1;
+    } while (0 <= o && lines[0][o].l != ~0);                        } while (0 <= o && lines[0][o].l != ~0);
+                                                                
+    // Now, o + 1 is the line number of the last matched old        // Now, o + 1 is the line number of the last matched old 
+    // n + 1 is the line number of the last matched new line.       // n + 1 is the line number of the last matched new line.
+    // to add new old and new lines, if they match.                 // to add new old and new lines, if they match.
+                                                                
+    // Finally, attempt to add unmatched lines to the preceed       // Finally, attempt to add unmatched lines to the preceed
+    // matched set.                                                 // matched set.
+                                                                
+    for (; 0 <= o && lines[0][o].l == ~0; o -= 1, n -= 1) {         for (; 0 <= o && lines[0][o].l == ~0; o -= 1, n -= 1) {
+                                                                
+      // If the [next] pair of old and new lines aren't the s         // If the [next] pair of old and new lines aren't the s
+                                                                
+      if (lines[0][o].line != lines[1][n].line) {                     if (lines[0][o].line != lines[1][n].line) {
+        break;                                                          break;
+      }                                                               }
+                                                                
+      // Match up the pair.                                           // Match up the pair.
+                                                                
+      lines[0][o].l = n;                                              lines[0][o].l = n;
+      lines[1][n].l = o;                                              lines[1][n].l = o;
+                                                                
+      // Remove the matched line numbers form the lists.              // Remove the matched line numbers form the lists.
+                                                                
+      Line *line = lines[0][o].line;                                  Line *line = lines[0][o].line;
+      list<unsigned> &oldCopies = line->copies[0];                    list<unsigned> &oldCopies = line->copies[0];
+      list<unsigned>::iterator oL = find (oldCopies.begin (),         list<unsigned>::iterator oL = find (oldCopies.begin (),
+      if (oL != oldCopies.end ()) {                                   if (oL != oldCopies.end ()) {
+        oldCopies.erase (oL);                                           oldCopies.erase (oL);
+      }                                                               }
+      list<unsigned> &newCopies = line->copies[0];                    list<unsigned> &newCopies = line->copies[0];
+      list<unsigned>::iterator nL = find (newCopies.begin (),         list<unsigned>::iterator nL = find (newCopies.begin (),
+      if (nL != newCopies.end ()) {                                   if (nL != newCopies.end ()) {
+        newCopies.erase (nL);                                           newCopies.erase (nL);
+      }                                                               }
+                                                                
+      nMatchedLines += 1;                                             nMatchedLines += 1;
+    }                                                               }
+    nMatchedBlocks += 1;                                            nMatchedBlocks += 1;
+  }                                                               }
+  nTotalMatchedLines += nMatchedLines;                            nTotalMatchedLines += nMatchedLines;
+                                                                
+  // Let's see the intermediate results.                          // Let's see the intermediate results.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr,                                                fprintf (stderr,
+             " found %u/%u matched lines/blocks (%u/%u totals                " found %u/%u matched lines/blocks (%u/%u totals
+             nMatchedLines,                                                  nMatchedLines,
+             nMatchedBlocks,                                                 nMatchedBlocks,
+             nTotalMatchedLines,                                             nTotalMatchedLines,
+             nTotalMatchedBlocks                                             nTotalMatchedBlocks
+            );                                                              );
+                                                                
+    if (1 < optVerbose) {                                           if (1 < optVerbose) {
+      for (int f = 0; f < 2; f += 1) {                                for (int f = 0; f < 2; f += 1) {
+        fprintf (stderr, "# file #%d\n", f + 1);                        fprintf (stderr, "# file #%d\n", f + 1);
+        for (int l = 0; l < lines[f].size (); l += 1) {                 for (int l = 0; l < lines[f].size (); l += 1) {
+          fprintf (stderr, "#   [%d] ", l);                               fprintf (stderr, "#   [%d] ", l);
+          lines[f][l].Dump (stderr);                                      lines[f][l].Dump (stderr);
+        }                                                               }
+      }                                                               }
+    }                                                               }
+  }                                                               }
+                                                                
+  // Perform pass #4, in which we find any remaining matches      // Perform pass #4, in which we find any remaining matches 
+  // the unique lines.  For every unique line that has more t     // the unique lines.  For every unique line that has more t
+  // copy in both files, we declare the copies to match.          // copy in both files, we declare the copies to match.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, "# Pass 4 (finding remaining matches amo       fprintf (stderr, "# Pass 4 (finding remaining matches amo
+  }                                                               }
+                                                                
+  nMatchedLines = 0;                                              nMatchedLines = 0;
+                                                                
+  for (MapStringToLinePtr::iterator i = table.begin (); i !=      for (MapStringToLinePtr::iterator i = table.begin (); i != 
+    Line *l = i->second;                                            Line *l = i->second;
+                                                                
+    // If there's more than 1 matching old and new lines, the       // If there's more than 1 matching old and new lines, the
+    // declare that each pair are (all) the same line.              // declare that each pair are (all) the same line.
+                                                                
+    // (In the original algorithm, we only recognized a match       // (In the original algorithm, we only recognized a match
+    // if there was exactly 1 copy for each file.)                  // if there was exactly 1 copy for each file.)
+                                                                
+    while (0 < l->copies[0].size () && 0 < l->copies[1].size        while (0 < l->copies[0].size () && 0 < l->copies[1].size 
+      nMatchedLines += 1;                                             nMatchedLines += 1;
+                                                                
+      // For each matched line in the new file, mark it with          // For each matched line in the new file, mark it with 
+      // corresponding line (number) in the old file.                 // corresponding line (number) in the old file.
+                                                                
+      unsigned o = l->copies[0].front ();                             unsigned o = l->copies[0].front ();
+      unsigned n = l->copies[1].front ();                             unsigned n = l->copies[1].front ();
+                                                                
+      // Match up the pair.                                           // Match up the pair.
+                                                                
+      lines[0][o].l = n;                                              lines[0][o].l = n;
+      lines[1][n].l = o;                                              lines[1][n].l = o;
+                                                                
+      // Remove the matched line numbers from the lists.              // Remove the matched line numbers from the lists.
+                                                                
+      l->copies[0].pop_front ();                                      l->copies[0].pop_front ();
+      l->copies[1].pop_front ();                                      l->copies[1].pop_front ();
+    }                                                               }
+  }                                                               }
+  nTotalMatchedLines += nMatchedLines;                            nTotalMatchedLines += nMatchedLines;
+                                                                
+  // Let's see the intermediate results.                          // Let's see the intermediate results.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, " found %u matched lines (%u total).\n",       fprintf (stderr, " found %u matched lines (%u total).\n",
+                                                                
+    if (1 < optVerbose) {                                           if (1 < optVerbose) {
+      for (int f = 0; f < 2; f += 1) {                                for (int f = 0; f < 2; f += 1) {
+        fprintf (stderr, "# file #%d\n", f + 1);                        fprintf (stderr, "# file #%d\n", f + 1);
+        for (int l = 0; l < lines[f].size (); l += 1) {                 for (int l = 0; l < lines[f].size (); l += 1) {
+          fprintf (stderr, "#   [%d] ", l);                               fprintf (stderr, "#   [%d] ", l);
+          lines[f][l].Dump (stderr);                                      lines[f][l].Dump (stderr);
+        }                                                               }
+      }                                                               }
+    }                                                               }
+  }                                                               }
+                                                                
+  // Perform Pass #5, in which we look for blocks which match     // Perform Pass #5, in which we look for blocks which match
+  // the result of a move (their not in their original positi     // the result of a move (their not in their original positi
+  // these, we'll unmatch the blocks, turning them into a del     // these, we'll unmatch the blocks, turning them into a del
+  // an insert.                                                   // an insert.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, "# Pass #5 (unmatching block moves)...\n       fprintf (stderr, "# Pass #5 (unmatching block moves)...\n
+  }                                                               }
+                                                                
+  nMatchedBlocks = 0;                                             nMatchedBlocks = 0;
+  nMatchedLines = 0;                                              nMatchedLines = 0;
+                                                                
+  // Starting at the top of both files,...                        // Starting at the top of both files,...
+                                                                
+  unsigned o = 0;                                                 unsigned o = 0;
+  unsigned n = 0;                                                 unsigned n = 0;
+                                                                
+  while (o < lines[0].size () || n < lines[1].size ()) {          while (o < lines[0].size () || n < lines[1].size ()) {
+                                                                
+    // Skip any unmatched lines at this point in the old file       // Skip any unmatched lines at this point in the old file
+    // are deletes.                                                 // are deletes.
+                                                                
+    //    Old     New                                               //    Old     New
+    //   +---+                                                      //   +---+
+    // 0 | a |                                                      // 0 | a |
+    //   +---+   +---+                                              //   +---+   +---+
+    //         0 | b |                                              //         0 | b |
+    //   +---+   +---+                                              //   +---+   +---+
+    // 1 | c | 1 | c |                                              // 1 | c | 1 | c |
+    //   +---+   +---+                                              //   +---+   +---+
+    //         2 | z |                                              //         2 | z |
+    //   +---+   +---+                                              //   +---+   +---+
+    // 2 | d | 3 | d |                                              // 2 | d | 3 | d |
+    //   +---+   +---+                                              //   +---+   +---+
+                                                                
+    while (o < lines[0].size () && lines[0][o].l == ~0) {           while (o < lines[0].size () && lines[0][o].l == ~0) {
+      o += 1;                                                         o += 1;
+    }                                                               }
+                                                                
+    // Skip any unmatched lines at this point in the new file       // Skip any unmatched lines at this point in the new file
+    // are inserts.                                                 // are inserts.
+                                                                
+    while (n < lines[1].size () && lines[1][n].l == ~0) {           while (n < lines[1].size () && lines[1][n].l == ~0) {
+      n += 1;                                                         n += 1;
+    }                                                               }
+                                                                
+    // When we get here, we know that we're dealing with matc       // When we get here, we know that we're dealing with matc
+    // lines (or the end of one or both files).  We're done w       // lines (or the end of one or both files).  We're done w
+    // pass, if we've reached the end of either file.               // pass, if we've reached the end of either file.
+                                                                
+    if (lines[0].size () <= o || lines[1].size () <= n) {           if (lines[0].size () <= o || lines[1].size () <= n) {
+      break;                                                          break;
+    }                                                               }
+                                                                
+    // We now know that we've got a pair of matching lines, t       // We now know that we've got a pair of matching lines, t
+    // of a matching block.  If the new file's line number is       // of a matching block.  If the new file's line number is
+    // expect, then the matched pair is unmoved, and we can s       // expect, then the matched pair is unmoved, and we can s
+    // the pair.  (If this is really the start of a block of        // the pair.  (If this is really the start of a block of 
+    // 1 lines, we'll handle it one pair at a time.)                // 1 lines, we'll handle it one pair at a time.)
+                                                                
+    if (lines[0][o].l == n) {                                       if (lines[0][o].l == n) {
+      o += 1;                                                         o += 1;
+      n += 1;                                                         n += 1;
+      continue;                                                       continue;
+    }                                                               }
+                                                                
+    // If, on the other hand, we don't expect this [new] line       // If, on the other hand, we don't expect this [new] line
+    // then this matching block has been moved.  We need to t       // then this matching block has been moved.  We need to t
+    // matched pair into an *unmatched* pair, one of deletes,       // matched pair into an *unmatched* pair, one of deletes,
+    // of inserts.  First, though, we need to know how big th       // of inserts.  First, though, we need to know how big th
+    // is, and how far it was moved....                             // is, and how far it was moved....
+                                                                
+    // Remember where we were when we started.                      // Remember where we were when we started.
+                                                                
+    unsigned oOld = o;                                              unsigned oOld = o;
+    unsigned nOld = n;                                              unsigned nOld = n;
+                                                                
+    // Remember where the block came from.                          // Remember where the block came from.
+                                                                
+    unsigned nNew = lines[0][o].l;                                  unsigned nNew = lines[0][o].l;
+                                                                
+    // Find the end of this matched pair.                           // Find the end of this matched pair.
+                                                                
+    for (n = nNew; o < lines[0].size () && n < lines[1].size        for (n = nNew; o < lines[0].size () && n < lines[1].size 
+      if (lines[0][o].l != n) {                                       if (lines[0][o].l != n) {
+        break;                                                          break;
+      }                                                               }
+    }                                                               }
+                                                                
+    // When we get here:                                            // When we get here:
+    // * oOld..o is the old file's block,                           // * oOld..o is the old file's block,
+    // * nNew..n is the new file's *moved* block, and               // * nNew..n is the new file's *moved* block, and
+    // * nOld is where we originally expected the new block f       // * nOld is where we originally expected the new block f
+                                                                 
+    // We can now calculate the length of the block...              // We can now calculate the length of the block...
+                                                                    
+    unsigned bSize = o - oOld;  // (or n - nNew)                    unsigned bSize = o - oOld;  // (or n - nNew)
+                                                                
+    // ... and we can calculate how far the block moved:            // ... and we can calculate how far the block moved:
+                                                                
+    unsigned bMove = nOld < nNew ? nNew - nOld : nOld - nNew;       unsigned bMove = nOld < nNew ? nNew - nOld : nOld - nNew;
+                                                                
+    // The larger of the two will become our delete, and the        // The larger of the two will become our delete, and the 
+    // will become our insert.                                      // will become our insert.
+                                                                
+    //    Old     New                                               //    Old     New
+    //   +---+   +---+                                              //   +---+   +---+
+    // 0 | a | 0 | b |                                              // 0 | a | 0 | b |
+    //   +---+ 1 | b |                                              //   +---+ 1 | b |
+    // 1 | b |   +---+                                              // 1 | b |   +---+
+    // 2 | b | 2 | a |                                              // 2 | b | 2 | a |
+    //   +---+   +---+                                              //   +---+   +---+
+    // 3 | c | 3 | c |                                              // 3 | c | 3 | c |
+    //   +---+   +---+                                              //   +---+   +---+
+                                                                
+    // (1) Delete a@0, insert a@2, or                               // (1) Delete a@0, insert a@2, or
+    // (2) insert bb@0, delete bb@1?                                // (2) insert bb@0, delete bb@1?
+                                                                
+    // In (1), bSize (of a) is 1-0 or 1, the size of a@0, and       // In (1), bSize (of a) is 1-0 or 1, the size of a@0, and
+    // (of a) is 2-0 or 2, the size of b@0.  We choose to del       // (of a) is 2-0 or 2, the size of b@0.  We choose to del
+    // and reinsert a@2.                                            // and reinsert a@2.
+                                                                
+    // if (bSize <= bMove) {                                        // if (bSize <= bMove) {
+      for (unsigned a = oOld; a < o; a += 1) {                        for (unsigned a = oOld; a < o; a += 1) {
+        lines[0][a].l = ~0;                                             lines[0][a].l = ~0;
+      }                                                               }
+      for (unsigned d = nNew; d < n; d += 1) {                        for (unsigned d = nNew; d < n; d += 1) {
+        lines[1][d].l = ~0;                                             lines[1][d].l = ~0;
+      }                                                               }
+    // } else {                                                     // } else {
+      // for (unsigned a = oOld; a < o; a += 1) {                     // for (unsigned a = oOld; a < o; a += 1) {
+      //   lines[0][a].l = ~0;                                        //   lines[0][a].l = ~0;
+      // }                                                            // }
+      // for (unsigned d = nNew; d < n; d += 1) {                     // for (unsigned d = nNew; d < n; d += 1) {
+      //   lines[1][d].l = ~0;                                        //   lines[1][d].l = ~0;
+      // }                                                            // }
+    // }                                                            // }
+                                                                
+    // Continue from where we left off.                             // Continue from where we left off.
+                                                                
+    n = nOld;                                                       n = nOld;
+  }                                                               }
+  nTotalMatchedLines -= nMatchedLines;                            nTotalMatchedLines -= nMatchedLines;
+  nTotalMatchedBlocks -= nMatchedBlocks;                          nTotalMatchedBlocks -= nMatchedBlocks;
+                                                                
+  // Let's see the intermediate results.                          // Let's see the intermediate results.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr,                                                fprintf (stderr,
+             " found %u/%u matched lines/blocks (%u/%u totals                " found %u/%u matched lines/blocks (%u/%u totals
+             nMatchedLines,                                                  nMatchedLines,
+             nMatchedBlocks,                                                 nMatchedBlocks,
+             nTotalMatchedLines,                                             nTotalMatchedLines,
+             nTotalMatchedBlocks                                             nTotalMatchedBlocks
+            );                                                              );
+                                                                
+    if (1 < optVerbose) {                                           if (1 < optVerbose) {
+      for (int f = 0; f < 2; f += 1) {                                for (int f = 0; f < 2; f += 1) {
+        fprintf (stderr, "# file #%d\n", f + 1);                        fprintf (stderr, "# file #%d\n", f + 1);
+        for (int l = 0; l < lines[f].size (); l += 1) {                 for (int l = 0; l < lines[f].size (); l += 1) {
+          fprintf (stderr, "#   [%d] ", l);                               fprintf (stderr, "#   [%d] ", l);
+          lines[f][l].Dump (stderr);                                      lines[f][l].Dump (stderr);
+        }                                                               }
+      }                                                               }
+    }                                                               }
+  }                                                               }
+                                                                
+  // Perform Pass #6, in which we create the desired output.      // Perform Pass #6, in which we create the desired output.
+                                                                
+  if (0 < optVerbose) {                                           if (0 < optVerbose) {
+    fprintf (stderr, "# Pass #6 (walking the differences)...\       fprintf (stderr, "# Pass #6 (walking the differences)...\
+  }                                                               }
+                                                                
+  nMatchedLines = 0;                                              nMatchedLines = 0;
+                                                                
+  // Write the header.                                            // Write the header.
+                                                                
+  switch (diffFormat) {                                           switch (diffFormat) {
+  case Default:                                                   case Default:
+  case Normal:                                                    case Normal:
+    break;                                                          break;
+  case Unified:                                                   case Unified:
+    fprintf (stdout, "--- %s\t%s\n", files[0], "0000-00-00 00       fprintf (stdout, "--- %s\t%s\n", files[0], "0000-00-00 00
+    fprintf (stdout, "+++ %s\t%s\n", files[1], "0000-00-00 00       fprintf (stdout, "+++ %s\t%s\n", files[1], "0000-00-00 00
+    fprintf (stdout, "@@ -1,%d +1,%d @@\n", lines[0].size (),       fprintf (stdout, "@@ -1,%d +1,%d @@\n", lines[0].size (),
+    break;                                                          break;
+  }                                                               }
+                                                                
+  // Starting at the top of both files,...                        // Starting at the top of both files,...
+                                                                
+  o = 0;                                                          o = 0;
+  n = 0;                                                          n = 0;
+                                                                
+  while (o < lines[0].size () || n < lines[1].size ()) {          while (o < lines[0].size () || n < lines[1].size ()) {
+                                                                
+    // Find any unmatched lines at this point in the old file       // Find any unmatched lines at this point in the old file
+    // are deletes.                                                 // are deletes.
+                                                                
+    unsigned boDeletes;                                             unsigned boDeletes;
+    for (boDeletes = o;                                             for (boDeletes = o;
+         o < lines[0].size () && lines[0][o].l == ~0;                    o < lines[0].size () && lines[0][o].l == ~0;
+         o += 1                                                          o += 1
+        )                                                               )
+    {}                                                              {}
+                                                                
+    // Find any unmatched lines at this point in the new file       // Find any unmatched lines at this point in the new file
+    // are inserts.                                                 // are inserts.
+                                                                
+    unsigned boInserts;                                             unsigned boInserts;
+    for (boInserts = n;                                             for (boInserts = n;
+         n < lines[1].size () && lines[1][n].l == ~0;                    n < lines[1].size () && lines[1][n].l == ~0;
+         n += 1                                                          n += 1
+        )                                                               )
+    {}                                                              {}
+                                                                
+    // We've got deleted line(s) from boDeletes .. o.               // We've got deleted line(s) from boDeletes .. o.
+    // We've got deleted line(s) from boInserts .. n.               // We've got deleted line(s) from boInserts .. n.
+                                                                
+    unsigned nDeletes = o - boDeletes;                              unsigned nDeletes = o - boDeletes;
+    unsigned nInserts = n - boInserts;                              unsigned nInserts = n - boInserts;
+                                                                
+    // We've got...                                                 // We've got...
+                                                                
+    if (nDeletes && nInserts) {                                     if (nDeletes && nInserts) {
+                                                                
+      // ... deletes and inserts.                                     // ... deletes and inserts.
+                                                                
+      switch (diffFormat) {                                           switch (diffFormat) {
+      case Default:                                                   case Default:
+      case Normal:                                                    case Normal:
+        if (1 < nDeletes && 1 < nInserts) {                             if (1 < nDeletes && 1 < nInserts) {
+          fprintf (stdout, "%d,%dc%d,%d\n", boDeletes + 1, o,             fprintf (stdout, "%d,%dc%d,%d\n", boDeletes + 1, o,
+        } else if (1 < nDeletes) {                                      } else if (1 < nDeletes) {
+          fprintf (stdout, "%d,%dc%d\n", boDeletes + 1, o, bo             fprintf (stdout, "%d,%dc%d\n", boDeletes + 1, o, bo
+        } else if (1 < nInserts) {                                      } else if (1 < nInserts) {
+          fprintf (stdout, "%dc%d,%d\n", boDeletes + 1, boIns             fprintf (stdout, "%dc%d,%d\n", boDeletes + 1, boIns
+        }                                                               } 
+        for (unsigned l = boDeletes; l < o; l += 1) {                   for (unsigned l = boDeletes; l < o; l += 1) {
+          fprintf (stdout, "< %s", lines[0][l].line->c_str ()             fprintf (stdout, "< %s", lines[0][l].line->c_str ()
+        }                                                               }
+        fprintf (stderr, "---\n");                                      fprintf (stderr, "---\n");
+        for (unsigned l = boInserts; l < n; l += 1) {                   for (unsigned l = boInserts; l < n; l += 1) {
+          fprintf (stdout, "> %s", lines[1][l].line->c_str ()             fprintf (stdout, "> %s", lines[1][l].line->c_str ()
+        }                                                               }
+        break;                                                          break;
+                                                                
+      case Unified:                                                   case Unified:
+        for (unsigned l = boDeletes; l < o; l += 1) {                   for (unsigned l = boDeletes; l < o; l += 1) {
+          fprintf (stdout, "-%s", lines[0][l].line->c_str ())             fprintf (stdout, "-%s", lines[0][l].line->c_str ())
+        }                                                               }
+        for (unsigned l = boInserts; l < n; l += 1) {                   for (unsigned l = boInserts; l < n; l += 1) {
+          fprintf (stdout, "+%s", lines[1][l].line->c_str ())             fprintf (stdout, "+%s", lines[1][l].line->c_str ())
+        }                                                               }
+        break;                                                          break;
+      }                                                               }
+    } else if (nDeletes) {                                          } else if (nDeletes) {
+                                                                
+      //  ... just deletes.                                           //  ... just deletes.
+                                                                
+      switch (diffFormat) {                                           switch (diffFormat) {
+      case Default:                                                   case Default:
+      case Normal:                                                    case Normal:
+        if (1 < nDeletes) {                                             if (1 < nDeletes) {
+          fprintf (stdout, "%d,%dd%d\n", boDeletes + 1, o, n)             fprintf (stdout, "%d,%dd%d\n", boDeletes + 1, o, n)
+        } else {                                                        } else {
+          fprintf (stdout, "%dd%d\n", boDeletes + 1, n);                  fprintf (stdout, "%dd%d\n", boDeletes + 1, n);
+        }                                                               }
+        for (unsigned l = boDeletes; l < o; l += 1) {                   for (unsigned l = boDeletes; l < o; l += 1) {
+          fprintf (stdout, "< %s", lines[0][l].line->c_str ()             fprintf (stdout, "< %s", lines[0][l].line->c_str ()
+        }                                                               }
+        break;                                                          break;
+      case Unified:                                                   case Unified:
+        for (unsigned l = boDeletes; l < o; l += 1) {                   for (unsigned l = boDeletes; l < o; l += 1) {
+          fprintf (stdout, "-%s", lines[0][l].line->c_str ())             fprintf (stdout, "-%s", lines[0][l].line->c_str ())
+        }                                                               }
+        break;                                                          break;
+      }                                                               }
+    } else if (nInserts) {                                          } else if (nInserts) {
+                                                                
+      //  ... just inserts.                                           //  ... just inserts.
+                                                                
+      switch (diffFormat) {                                           switch (diffFormat) {
+      case Default:                                                   case Default:
+      case Normal:                                                    case Normal:
+        if (1 < nInserts) {                                             if (1 < nInserts) {
+          fprintf (stdout, "%da%d,%d\n", o, boInserts + 1, n)             fprintf (stdout, "%da%d,%d\n", o, boInserts + 1, n)
+        } else {                                                        } else {
+          fprintf (stdout, "%da%d\n", o, boInserts + 1);                  fprintf (stdout, "%da%d\n", o, boInserts + 1);
+        }                                                               }
+        for (unsigned l = boInserts; l < n; l += 1) {                   for (unsigned l = boInserts; l < n; l += 1) {
+          fprintf (stdout, "> %s", lines[1][l].line->c_str ()             fprintf (stdout, "> %s", lines[1][l].line->c_str ()
+        }                                                               }
+        break;                                                          break;
+      case Unified:                                                   case Unified:
+        for (unsigned l = boInserts; l < n; l += 1) {                   for (unsigned l = boInserts; l < n; l += 1) {
+          fprintf (stdout, "+%s", lines[1][l].line->c_str ())             fprintf (stdout, "+%s", lines[1][l].line->c_str ())
+        }                                                               }
+        break;                                                          break;
+      }                                                               }
+    }                                                               }
+                                                                
+    // When we get here, we're dealing with matching lines.         // When we get here, we're dealing with matching lines.
+                                                                
+    switch (diffFormat) {                                           switch (diffFormat) {
+    case Default:                                                   case Default:
+    case Normal:                                                    case Normal:
+      break;                                                          break;
+    case Unified:                                                   case Unified:
+      fprintf (stdout, " %s", lines[0][o].line->c_str ());            fprintf (stdout, " %s", lines[0][o].line->c_str ());
+      break;                                                          break;
+    }                                                               }
+    o += 1;                                                         o += 1;
+    n += 1;                                                         n += 1;
+  }                                                               }
+}                                                               }

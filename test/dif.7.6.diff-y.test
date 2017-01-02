@@ -1,0 +1,132 @@
+#include <algorithm>                                            #include <algorithm>
+using std::find;                                                using std::find;
+#include <string>                                               #include <string>
+using std::string;                                              using std::string;
+#include <list>                                                 #include <list>
+using std::list;                                                using std::list;
+#include <map>                                                  #include <map>
+using std::map;                                                 using std::map;
+#include <vector>                                               #include <vector>
+using std::vector;                                              using std::vector;
+#include <stdio.h>                                              #include <stdio.h>
+                                                                
+enum DiffFormat {                                               enum DiffFormat {
+  Default,                                                        Default,
+                                                                
+  Context,                                                        Context,
+  EdScript,                                                       EdScript,
+  IfThenElse,                                                     IfThenElse,
+  Normal,                                                         Normal,
+  RCS,                                                            RCS,
+  SideBySide,                                                     SideBySide,
+  Unified                                                         Unified
+};                                                              };
+                                                                
+DiffFormat diffFormat = SideBySide;                           | DiffFormat diffFormat = Context;
+                                                              <
+unsigned optCopyContext = 3;                                    unsigned optCopyContext = 3;
+unsigned optPageWidth = 130;                                  | 
+unsigned optVerbose = 2;                                      | int optVerbose = 1;
+                                                                
+struct Line : public string {                                   struct Line : public string {
+  Line (string _text) :                                           Line (string _text) :
+    string (_text)                                                  string (_text)
+  {                                                               {
+  }                                                               }
+  ~Line () {                                                      ~Line () {
+    copies[0].erase (copies[0].begin (), copies[0].end ());         copies[0].erase (copies[0].begin (), copies[0].end ());
+    copies[1].erase (copies[1].begin (), copies[1].end ());         copies[1].erase (copies[1].begin (), copies[1].end ());
+  }                                                               }
+  void Dump (FILE *out) {                                         void Dump (FILE *out) {
+    fprintf (out, "{{ ");                                           fprintf (out, "{{ ");
+    for (list<unsigned>::iterator i = copies[0].begin (); i !       for (list<unsigned>::iterator i = copies[0].begin (); i !
+      fprintf (out, "%u ", *i);                                       fprintf (out, "%u ", *i);
+    }                                                               }
+    fprintf (out, "},{ ");                                          fprintf (out, "},{ ");
+    for (list<unsigned>::iterator i = copies[1].begin (); i !       for (list<unsigned>::iterator i = copies[1].begin (); i !
+      fprintf (out, "%u ", *i);                                       fprintf (out, "%u ", *i);
+    }                                                               }
+    fprintf (out, "}}\t%s\n", c_str ());                      |     fprintf (out, "}}\t%s", c_str ());
+  }                                                               }
+  list<unsigned> copies[2];                                       list<unsigned> copies[2];
+};                                                              };
+                                                                
+struct LinePtr {                                                struct LinePtr {
+  LinePtr (Line *_line) :                                         LinePtr (Line *_line) :
+    line (_line),                                                   line (_line),
+    l (~0u)                                                         l (~0u)
+  {                                                               {
+  }                                                               }
+  void Dump (FILE *out) {                                         void Dump (FILE *out) {
+    fprintf (out, "[%d] ", l);                                      fprintf (out, "[%d] ", l);
+    line->Dump (out);                                               line->Dump (out);
+  }                                                               }
+  Line *line;                                                     Line *line;
+  unsigned l;                                                     unsigned l;
+};                                                              };
+                                                                
+typedef map<string, Line *> MapStringToLinePtr;                 typedef map<string, Line *> MapStringToLinePtr;
+typedef vector<LinePtr> VectorLinePtr;                          typedef vector<LinePtr> VectorLinePtr;
+                                                                
+// Our name.                                                    // Our name.
+                                                                
+char *ARGV0 = "dif3";                                           char *ARGV0 = "dif3";
+                                                                
+// The 'symbol' (line) table.                                   // The 'symbol' (line) table.
+                                                                
+MapStringToLinePtr table;                                       MapStringToLinePtr table;
+                                                                
+// The names of the 2 files to be diff'd.                       // The names of the 2 files to be diff'd.
+                                                                
+char const *files[2] = { 0, 0 };                                char const *files[2] = { 0, 0 };
+                                                                
+// The lines of the 2 files to be diff'd.                       // The lines of the 2 files to be diff'd.
+                                                                
+VectorLinePtr lines[2];                                         VectorLinePtr lines[2];
+                                                                
+// Miscellaneous metrics.                                       // Miscellaneous metrics.
+                                                                
+unsigned nTotalMatchedBlocks = 0;                               unsigned nTotalMatchedBlocks = 0;
+unsigned nMatchedBlocks = 0;                                    unsigned nMatchedBlocks = 0;
+unsigned nTotalMatchedLines = 0;                                unsigned nTotalMatchedLines = 0;
+unsigned nMatchedLines = 0;                                     unsigned nMatchedLines = 0;
+                                                                
+void pass1 ();                                                  void pass1 ();
+void pass2 ();                                                  void pass2 ();
+void pass3 ();                                                  void pass3 ();
+void pass4 ();                                                  void pass4 ();
+void pass5 ();                                                  void pass5 ();
+void pass6 ();                                                  void pass6 ();
+                                                                
+int main (int argc, char *argv[])                            sdiff: sdiff.cpp:1858: void pass6y(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+   int main (int argc, char *argv[])
+{                                                               {
+  // Read the old [0] file, and the new [1] file.                 // Read the old [0] file, and the new [1] file.
+                                                                
+  for (int a = 1, n = 0; a < argc && n < 2; a += 1, n += 1) {     for (int a = 1, n = 0; a < argc && n < 2; a += 1, n += 1) {
+    files[n] = argv[a];                                             files[n] = argv[a];
+                                                                
+    if (FILE *f = fopen (files[n], "r")) {                          if (FILE *f = fopen (files[n], "r")) {
+      if (0 < optVerbose) {                                           if (0 < optVerbose) {
+        fprintf (stderr, "# Reading %s...", files[n]);                  fprintf (stderr, "# Reading %s...", files[n]);
+        fflush (stderr);                                      <
+      }                                                               }
+                                                                
+      char buffer[1024];                                              char buffer[1024];
+      unsigned nUniq = 0;                                             unsigned nUniq = 0;
+                                                                
+      while (fgets (buffer, sizeof (buffer), f)) {                    while (fgets (buffer, sizeof (buffer), f)) {
+        string text (buffer);                                           string text (buffer);
+                                                              > 
+                                                              >         Line *line = table[text];
+                                                              > 
+                                                              >         if (!line) {
+                                                              >           table[text] = line = new Line (text);
+                                                              >           nUniq += 1;
+                                                              >         }
+                                                              >         line->copies[n].push_back (lines[n].size ());
+                                                              >         lines[n].push_back (line);
+                                                              >       }
+                                                              > 
+                                                              >       if (0 < optVerbose) {
+                                                              >         fprintf (stderr, " %u lines, %u unique.\n", lines[n].

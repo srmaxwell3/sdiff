@@ -1,0 +1,46 @@
+#!/bin/bash
+
+DIFF=${DIFF:-sdiff}
+
+function diffTest {
+    local oSrc="${1}"
+    shift
+    local nSrc="${1}"
+    shift
+    local dst="${1}"
+    shift
+    local option="${@}"
+
+    echo "# ${DIFF} ${option} ${oSrc} ${nSrc} >& ${dst}.test"
+    ${DIFF} "${option}" "${oSrc}" "${nSrc}" >& "${dst}.test"
+    title "${dst}"
+    if [ -f ${dst}.diff ]
+    then
+        diff "${dst}.diff" "${dst}.test"
+    fi
+}
+
+declare -a options=( \
+    "--normal" \
+    "-c" \
+    "-u" \
+    "-y" \
+)
+
+for option in "${options[@]}"
+do
+    for (( i = 0; i < 8; i += 1 ))
+    do
+      j=$(( i + 1 ))
+      iSrc=`printf "dif.%d.cpp" $i`
+      jSrc=`printf "dif.%d.cpp" $j`
+
+      opts=`echo ${option} | sed -e 's/  *//g'`
+
+      ijDst=`printf "dif.%d.%d.diff%s" $i $j "$opts"`
+      jiDst=`printf "dif.%d.%d.diff%s" $j $i "$opts"`
+
+      diffTest "${iSrc}" "${jSrc}" "${ijDst}" "${option}"
+      diffTest "${jSrc}" "${iSrc}" "${jiDst}" "${option}"
+    done
+done

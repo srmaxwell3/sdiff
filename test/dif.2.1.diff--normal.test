@@ -1,0 +1,12 @@
+sdiff: sdiff.cpp:1637: void pass6n(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+3,4d2
+< #include <list>
+< using std::list;
+9a8,14
+> 
+> int main (int argc, char *argv[])
+> {
+>   map<string, int> table;
+>   vector<vector<int *> *> fileLines;
+> 
+>   for (int a = 1; a < argc; a += 1) {

@@ -1,0 +1,58 @@
+--- dif.0.cpp	2008-02-20 19:41:29.000000000 +0000
++++ dif.1.cpp	2008-02-20 19:55:12.000000000 +0000
+@@ -1,32 +1,46 @@
+-#include <map>
+-using std::map;
+ #include <string>
+ using std::string;
++#include <map>
++using std::map;
++#include <vector>
++using std::vector;
+ #include <stdio.h>
+ 
+ int main (int argc, char *argv[])
+ {
+   map<string, int> table;
++  vector<vector<int *> *> fileLines;
++
+   for (int a = 1; a < argc; a += 1) {
+     if (FILE *f = fopen (argv[a], "r")) {
+       fprintf (stderr, "# Reading %s...", argv[a]);
++      vector<int *> *lines = new vector<int *> ();
++
+       char buffer[1024];
+-      unsigned n = 0;
+       while (fgets (buffer, sizeof (buffer), f)) {
+-	string l (buffer);
+-	table[l] += 1;
+-	n += 1;
++        int *line = &table[buffer];
++        lines->push_back (line);
++        *line += 1;
+       }
+-      fprintf (stderr, " %u lines.\n", n);
++      fprintf (stderr, " %u lines.\n", lines->size ());
++      fileLines.push_back (lines);
+     } else {
++      fprintf (stderr, "%s: Unable to open %s!  Ignoring....\n", argv[a]);
+     }
+   }
+-  printf ("table.size () = %d\n", table.size ());
++  printf ("# table.size () = %d\n", table.size ());
+   map<int, int> counts;
+   for (map<string, int>::iterator i = table.begin (); i != table.end (); i++) {
+     counts[i->second] += 1;
+   }
+   for (map<int, int>::iterator i = counts.begin (); i != counts.end (); i++) {
+-    fprintf (stderr, "counts[%d] = %d\n", i->first, i->second);
++    fprintf (stderr, "# counts[%d] = %d\n", i->first, i->second);
++  }
++  for (int f = 0; f < fileLines.size (); f += 1) {
++    fprintf (stderr, "# file #%d\n", f);
++    vector<int *> *lines = fileLines[f];
++    for (int l = 0; l < lines->size (); l += 1) {
++      fprintf (stderr, "#   [%d] = %d\n", l, *(*lines)[l]);
++    }
+   }
+ }

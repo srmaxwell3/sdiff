@@ -1,0 +1,31 @@
+sdiff: sdiff.cpp:1637: void pass6n(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+25,26c25
+< DiffFormat diffFormat = SideBySide;
+< 
+---
+> DiffFormat diffFormat = Context;
+28,29c27,28
+< unsigned optPageWidth = 130;
+< unsigned optVerbose = 2;
+---
+> 
+> int optVerbose = 1;
+<     fprintf (out, "}}\t%s\n", c_str ());
+---
+>     fprintf (out, "}}\t%s", c_str ());
+111d109
+<         fflush (stderr);
+118a117,129
+> 
+>         Line *line = table[text];
+> 
+>         if (!line) {
+>           table[text] = line = new Line (text);
+>           nUniq += 1;
+>         }
+>         line->copies[n].push_back (lines[n].size ());
+>         lines[n].push_back (line);
+>       }
+> 
+>       if (0 < optVerbose) {
+>         fprintf (stderr, " %u lines, %u unique.\n", lines[n].size (), nUniq);

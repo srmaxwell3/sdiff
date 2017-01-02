@@ -1,0 +1,66 @@
+sdiff: sdiff.cpp:1637: void pass6n(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+12d11
+< #include <getopt.h>
+15,24c14
+<   opt_D_IfThenElse,
+<   opt___Normal,
+<   opt_c_Context,
+<   opt_e_EdScript,
+<   opt_n_RCS,
+<   opt_u_Unified,
+<   opt_y_SideBySide
+< };
+< 
+< DiffFormat opt___OutputFormat = opt___Normal;
+---
+>   Default,
+26,50c16,25
+< bool       opt_B_IgnoreBlankLines = false;
+< unsigned   opt_C_LinesOfCopyContext = 3;
+< string     opt_D_IfdefName;
+< bool       opt_E_IgnoreTabExpansionChanges = false;
+< string     opt_F_ShowMostRecentLineMatching;
+< string     opt_I_IgnoreLinesMatching;
+< bool       opt_N_TreatAbsentFilesAsEmpty = false;
+< string     opt_S_StartWithFileMatching;
+< bool       opt_T_PrependATab = false;
+< unsigned   opt_U_LinesOfUnifiedContext = 3;
+< unsigned   opt_W_MaxPrintColumns = 130;
+< string     opt_X_ExcludeFilesMatching;
+< bool       opt_a_TreatAllFilesAsText = false;
+< bool       opt_b_IgnoreWhitespaceChanges = false;
+< bool       opt_d_TryToFindMinimalChanges = false;
+< bool       opt_i_IgnoreCaseDifferences = false;
+< bool       opt_l_PaginateWithPr = false;
+< bool       opt_p_ShowChangedCFunction = false;
+< bool       opt_q_OutputOnlyIfFilesDiffer = false;
+< bool       opt_r_RecursivelyCompareSubdirectories = false;
+< bool       opt_s_ReportWhenFilesAreSame = false;
+< bool       opt_t_ExpandTabs = false;
+< bool       opt_v_ShowVersionInfo = false;
+< bool       opt_w_IgnoreAllWhitespace = false;
+< string     opt_x_IgnoreFilesMatching;
+---
+>   Context,
+>   EdScript,
+>   IfThenElse,
+>   Normal,
+>   RCS,
+>   SideBySide,
+>   Unified
+> };
+> 
+> DiffFormat diffFormat = SideBySide;
+51a27,28
+> unsigned optCopyContext = 3;
+> unsigned optPageWidth = 130;
+115a93,101
+> 
+> void pass1 ();
+> void pass2 ();
+> void pass3 ();
+> void pass4 ();
+> void pass5 ();
+> void pass6 ();
+> 
+> int main (int argc, char *argv[])

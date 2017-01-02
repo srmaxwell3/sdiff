@@ -1,0 +1,20 @@
+sdiff: sdiff.cpp:1745: void pass6u(): Assertion `lines[0][o].line == lines[1][n].line' failed.
+--- dif.2.cpp	0000-00-00 00:00:00.000000000 +0000
++++ dif.1.cpp	0000-00-00 00:00:00.000000000 +0000
+@@ -1,65 +1,46 @@
+ #include <string>
+ using std::string;
+-#include <list>
+-using std::list;
+ #include <map>
+ using std::map;
+ #include <vector>
+ using std::vector;
+ #include <stdio.h>
++
++int main (int argc, char *argv[])
++{
++  map<string, int> table;
++  vector<vector<int *> *> fileLines;
++
++  for (int a = 1; a < argc; a += 1) {

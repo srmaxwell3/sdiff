@@ -1,0 +1,3 @@
+sdiff: sdiff.cpp:1363: void pass6c(): Assertion `widenWindow || lines[0][o].line == lines[1][n].line' failed.
+*** dif.7.cpp	0000-00-00 00:00:00.000000000 +0000
+--- dif.8.cpp	0000-00-00 00:00:00.000000000 +0000

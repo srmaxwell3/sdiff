@@ -1,0 +1,374 @@
+25,26c25
+< DiffFormat diffFormat = Context;
+< unsigned optCopyContext = 3;
+---
+> DiffFormat diffFormat = SideBySide;
+28c27,29
+< int optVerbose = 1;
+---
+> unsigned optCopyContext = 3;
+> unsigned optPageWidth = 130;
+> unsigned optVerbose = 2;
+48c49
+<     fprintf (out, "}}\t%s", c_str ());
+---
+>     fprintf (out, "}}\t%s\n", c_str ());
+109a111
+>         fflush (stderr);
+117a120,121
+>         text.erase (text.end () - 1);
+> 
+129a134
+>         fflush (stderr);
+132a138
+>       fflush (stderr);
+139a146
+>     fflush (stderr);
+168a176
+>     fflush (stderr);
+210a219
+>     fflush (stderr);
+212c221
+<     if (1 < optVerbose) {
+---
+>     if (2 < optVerbose) {
+214a224
+>         fflush (stderr);
+216a227
+>           fflush (stderr);
+230a242
+>     fflush (stderr);
+307c319,320
+<     if (1 < optVerbose) {
+---
+>     fflush (stderr);
+>     if (2 < optVerbose) {
+309a323
+>         fflush (stderr);
+311a326
+>           fflush (stderr);
+325a341
+>     fflush (stderr);
+400a417
+>     fflush (stderr);
+402c419
+<     if (1 < optVerbose) {
+---
+>     if (2 < optVerbose) {
+404a422
+>         fflush (stderr);
+406a425
+>           fflush (stderr);
+421a441
+>     fflush (stderr);
+460a481
+>     fflush (stderr);
+462c483
+<     if (1 < optVerbose) {
+---
+>     if (2 < optVerbose) {
+464a486
+>         fflush (stderr);
+466a489
+>           fflush (stderr);
+482a506
+>     fflush (stderr);
+630a655
+>     fflush (stderr);
+632c657
+<     if (1 < optVerbose) {
+---
+>     if (2 < optVerbose) {
+634a660
+>         fflush (stderr);
+636a663
+>           fflush (stderr);
+652a680
+> void pass6y ();
+679c707
+<     pass6s ();
+---
+>     pass6y ();
+709c737,738
+<     fprintf (stderr, "# Pass #6u (walking the differences)...\n");
+---
+>     fprintf (stderr, "# Pass #6c (walking the differences)...\n");
+>     fflush (stderr);
+737c766
+<     // We're looking at at least 1 delete or insert, so a window
+---
+>     // We're now looking at at least 1 delete or insert, so a window
+740,741c769,770
+<     int boOldWindow = max (0, int (boDeletes) - int(optCopyContext));
+<     int eoOldWindow = min (int (lines[0].size ()), int(o) + int(optCopyContext));
+---
+>     int boOldWindow = max (0, int (o) - int (optCopyContext));
+>     int boNewWindow = max (0, int (n) - int (optCopyContext));
+743c772,775
+<     // Look for the end of the window.
+---
+>     if (1 < optVerbose) {
+>       fprintf (stderr, "boOldWindow = %d, boNewWindow = %d\n", boOldWindow, boNewWindow);
+>       fflush (stderr);
+>     }
+745,746c777,783
+<     bool widenWindow = false;
+<     do {
+---
+>     // Look for the end of the current window.
+> 
+>     int eoOldWindow;
+>     int eoNewWindow;
+> 
+>     bool widenWindow = true;
+>     while (widenWindow && o < lines[0].size () || n < lines[1].size ()) {
+758,761c795,796
+<       // ...  This context will end optCopyContext lines past the last
+<       // set of deletes or inserts we find.  However, since another
+<       // window could follow, we look 2 * optCopyContext ahead for
+<       // another delete or insert.
+---
+>       // This context will end optCopyContext matched lines past the
+>       // last set of deletes or inserts we find.
+763c798,799
+<       for (unsigned l = 0; l < (2 * optCopyContext); i += 1) {
+---
+>       widenWindow = false;
+>       for (unsigned l = 0; !widenWindow && l < optCopyContext; l += 1) {
+765,767c801
+<           if (widenWindow |= lines[0][o].l == ~0) {
+<             break;
+<           }
+---
+>           widenWindow |= lines[0][o].l == ~0;
+771,773c805
+<           if (widenWindow |= lines[1][o].l == ~0) {
+<             break;
+<           }
+---
+>           widenWindow |= lines[1][n].l == ~0;
+777c809,828
+<     } while (widenWindow);
+---
+> 
+>       eoOldWindow = o;
+>       eoNewWindow = n;
+> 
+>       // However, since another window could follow, we look
+>       // optCopyContext ahead for another delete or insert.
+> 
+>       if (!widenWindow) {
+>         for (unsigned l = 0; l < (2 * optCopyContext + 1); l += 1) {
+>           if (o < lines[0].size ()) {
+>             widenWindow |= lines[0][o].l == ~0;
+>             o += 1;
+>           }
+>           if (n < lines[1].size ()) {
+>             widenWindow |= lines[1][n].l == ~0;
+>             n += 1;
+>           }
+>         }
+>       }
+>     }
+781,782c832,835
+<     int boNewWindow = max (0, int (boInserts) - int (optCopyContext));
+<     int eoNewWindow = min (int (lines[1].size ()), int(n) + int (optCopyContext));
+---
+>     if (1 < optVerbose) {
+>       fprintf (stderr, "eoOldWindow = %d, eoNewWindow = %d\n", eoOldWindow, eoNewWindow);
+>       fflush (stderr);
+>     }
+789c842
+<     fprintf (stdout, "*** %d,%d ****\n", boOldWindow + 1, eoOldWindow + 1);
+---
+>     fprintf (stdout, "*** %d,%d ****\n", boOldWindow + 1, eoOldWindow);
+794c847
+<     while (o < eoOldWindow && n < eoNewWindow) {
+---
+>     while (o < eoOldWindow || n < eoNewWindow) {
+825c878
+<           fprintf (stdout, "! %s", lines[0][l].line->c_str ());
+---
+>           fprintf (stdout, "! %s\n", lines[0][l].line->c_str ());
+832c885
+<           fprintf (stdout, "- %s", lines[0][l].line->c_str ());
+---
+>           fprintf (stdout, "- %s\n", lines[0][l].line->c_str ());
+838c891
+<       fprintf (stdout, "  %s", lines[0][l].line->c_str ());
+---
+>       fprintf (stdout, "  %s\n", lines[0][o].line->c_str ());
+843c896
+<     fprintf (stdout, "--- %d,%d ----\n", boNewWindow + 1, eoNewWindow + 1);
+---
+>     fprintf (stdout, "--- %d,%d ----\n", boNewWindow + 1, eoNewWindow);
+879c932
+<           fprintf (stdout, "! %s", lines[1][l].line->c_str ());
+---
+>           fprintf (stdout, "! %s\n", lines[1][l].line->c_str ());
+886c939
+<           fprintf (stdout, "+ %s", lines[1][l].line->c_str ());
+---
+>           fprintf (stdout, "+ %s\n", lines[1][l].line->c_str ());
+892c945
+<       fprintf (stdout, "  %s", lines[1][l].line->c_str ());
+---
+>       fprintf (stdout, "  %s\n", lines[1][n].line->c_str ());
+895a949,953
+> 
+>     // Reset to the end of the current window.
+> 
+>     o = eoOldWindow;
+>     n = eoNewWindow;
+899a958,959
+>   fprintf (stderr, "pass6e() is unimplemented!\n");
+>   fflush (stderr);
+902a963,964
+>   fprintf (stderr, "pass6i() is unimplemented!\n");
+>   fflush (stderr);
+908a971
+>     fflush (stderr);
+962c1025
+<         fprintf (stdout, "< %s", lines[0][l].line->c_str ());
+---
+>         fprintf (stdout, "< %s\n", lines[0][l].line->c_str ());
+964c1027
+<       fprintf (stderr, "---\n");
+---
+>       fprintf (stdout, "---\n");
+966c1029
+<         fprintf (stdout, "> %s", lines[1][l].line->c_str ());
+---
+>         fprintf (stdout, "> %s\n", lines[1][l].line->c_str ());
+978c1041
+<         fprintf (stdout, "< %s", lines[0][l].line->c_str ());
+---
+>         fprintf (stdout, "< %s\n", lines[0][l].line->c_str ());
+990c1053
+<         fprintf (stdout, "> %s", lines[1][l].line->c_str ());
+---
+>         fprintf (stdout, "> %s\n", lines[1][l].line->c_str ());
+1001a1065,1066
+>   fprintf (stderr, "pass6r() is unimplemented!\n");
+>   fflush (stderr);
+1004a1070,1071
+>   fprintf (stderr, "pass6s() is unimplemented!\n");
+>   fflush (stderr);
+1010a1078
+>     fflush (stderr);
+1061c1129
+<         fprintf (stdout, "-%s", lines[0][l].line->c_str ());
+---
+>         fprintf (stdout, "-%s\n", lines[0][l].line->c_str ());
+1064c1132
+<         fprintf (stdout, "+%s", lines[1][l].line->c_str ());
+---
+>         fprintf (stdout, "+%s\n", lines[1][l].line->c_str ());
+1071c1139
+<         fprintf (stdout, "-%s", lines[0][l].line->c_str ());
+---
+>         fprintf (stdout, "-%s\n", lines[0][l].line->c_str ());
+1078c1146
+<         fprintf (stdout, "+%s", lines[1][l].line->c_str ());
+---
+>         fprintf (stdout, "+%s\n", lines[1][l].line->c_str ());
+1084c1152,1248
+<     fprintf (stdout, " %s", lines[0][o].line->c_str ());
+---
+>     fprintf (stdout, " %s\n", lines[0][o].line->c_str ());
+>     o += 1;
+>     n += 1;
+>   }
+> }
+> 
+> void pass6y ()
+> {
+>   if (0 < optVerbose) {
+>     fprintf (stderr, "# Pass #6y (walking the differences)...\n");
+>     fflush (stderr);
+>   }
+> 
+>   // Write the header.
+> 
+>   // None for side-by-side.
+> 
+>   // Starting at the top of both files,...
+> 
+>   int columnWidth = (optPageWidth - 7) / 2;
+> 
+>   unsigned o = 0;
+>   unsigned n = 0;
+> 
+>   while (o < lines[0].size () || n < lines[1].size ()) {
+> 
+>     // Find any unmatched lines at this point in the old file.  These
+>     // are deletes.
+> 
+>     unsigned boDeletes = o;
+>     while (o < lines[0].size () && lines[0][o].l == ~0) {
+>       o += 1;
+>     }
+> 
+>     // Find any unmatched lines at this point in the new file.  These
+>     // are inserts.
+> 
+>     unsigned boInserts = n;
+>     while (n < lines[1].size () && lines[1][n].l == ~0) {
+>       n += 1;
+>     }
+> 
+>     // We've got deleted line(s) from boDeletes .. o.
+>     // We've got deleted line(s) from boInserts .. n.
+> 
+>     unsigned nDeletes = o - boDeletes;
+>     unsigned nInserts = n - boInserts;
+> 
+>     // We've got...
+> 
+>     while (boDeletes < o && boInserts < n) {
+> 
+>       // ... deletes and inserts.
+> 
+>       fprintf (stdout,
+>                "%-*s | %s\n",
+>                columnWidth,
+>                lines[0][boDeletes].line->substr (0, columnWidth).c_str (),
+>                lines[1][boInserts].line->substr (0, columnWidth).c_str ()
+>               );
+>       boDeletes += 1;
+>       boInserts += 1;
+>     }
+> 
+>     while (boDeletes < o) {
+> 
+>       //  ... just deletes.
+> 
+>       fprintf (stdout,
+>                "%-*s <\n",
+>                columnWidth,
+>                lines[0][boDeletes].line->substr (0, columnWidth).c_str ()
+>               );
+>       boDeletes += 1;
+>     }
+> 
+>     while (boInserts < n) {
+> 
+>       //  ... just inserts.
+> 
+>       fprintf (stdout,
+>                "%-*s > %s\n",
+>                columnWidth,
+>                "",
+>                lines[1][boInserts].line->substr (0, columnWidth).c_str ()
+>               );
+>       boInserts += 1;
+>     }
+> 
+>     // When we get here, we're dealing with matching lines.
+> 
+>     fprintf (stdout,
+>              "%-*s   %s\n",
+>              columnWidth,
+>              lines[0][o].line->substr (0, columnWidth).c_str (),
+>              lines[1][n].line->substr (0, columnWidth).c_str ()
+>             );
