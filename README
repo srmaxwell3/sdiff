@@ -1,0 +1,6 @@
+Way back when, I implementated a version of diff, which I initially
+called dif, based on Paul Heckel's Diff Algorithm.  It allowed me to
+get a working diff on CP/M, was compiled with Leor Zolman's C
+compiler, and worked against fairly large files.  Much later, I
+re-wrote it in C++ as an exercise, and started adding more GNU-like
+features, including most of the output formats.
